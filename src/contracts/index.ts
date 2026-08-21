@@ -5,6 +5,9 @@ import * as courses from './courses'
 import * as mentor from './mentor'
 import * as sessions from './sessions'
 import * as users from './users'
+import * as userDashboard from './user-dashboard'
 
-export const contracts = { admin, courses, mentor, sessions, users }
+// Union of both sides of this merge: this branch's `mentor` (Feature 07) and the
+// student-dashboard branch's `userDashboard` (Feature 10).
+export const contracts = { admin, courses, mentor, sessions, users, userDashboard }
 export type Contracts = typeof contracts
