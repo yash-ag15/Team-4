@@ -61,7 +61,9 @@ async function main() {
   }
 
   const { db } = await import('@/db')
-  const { projects, tasks } = await import('@/db/schema')
+  const schema = (await import('@/db/schema')) as Record<string, any>
+  const projects = schema.projects
+  const tasks = schema.tasks
   const factories = (await import('@/mocks/factories')) as {
     mockProjects?: MockProject[]
     mockTasks?: MockTask[]
