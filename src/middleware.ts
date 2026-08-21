@@ -29,5 +29,10 @@ export const config = {
     '/mentor/:path*',
     '/admin/:path*',
     '/onboarding',
+    // Both run immediately after sign-in and both read the session server-side. Listed
+    // here so an unauthenticated hit bounces at the edge instead of rendering a server
+    // component only to redirect from inside it.
+    '/post-auth',
+    '/session-conflict',
   ],
 }

@@ -1,9 +1,11 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { nextCookies } from 'better-auth/next-js'
+import type { DBAdapterInstance } from 'better-auth/types'
 
 import { db } from '@/db'
 import * as schema from '@/db/schema'
+import { withEmailEncryption } from '@/lib/auth-adapter'
 import { sendEmail } from '@/lib/email'
 
 /**
@@ -13,10 +15,21 @@ import { sendEmail } from '@/lib/email'
 export const SYSTEM_ROLES = ['student', 'mentor', 'admin'] as const
 export type SystemRole = (typeof SYSTEM_ROLES)[number]
 
+/**
+ * The Drizzle adapter, wrapped so `user.email` is ciphertext at rest.
+ *
+ * Better Auth still hands the adapter a plaintext address and still gets one back —
+ * every translation lives in `@/lib/auth-adapter`, which is why no other file in the app
+ * (or any teammate's feature) has to know the column is encrypted.
+ */
+const baseAdapter = drizzleAdapter(db, { provider: 'pg', schema })
+const encryptedDatabaseAdapter: DBAdapterInstance = (options) =>
+  withEmailEncryption(baseAdapter(options))
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL, // required, or Google → redirect_uri_mismatch
   secret: process.env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, { provider: 'pg', schema }),
+  database: encryptedDatabaseAdapter,
 
   emailAndPassword: {
     enabled: true,

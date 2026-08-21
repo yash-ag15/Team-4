@@ -48,8 +48,10 @@ export default function SignUpPage() {
       return
     }
 
-    router.push('/onboarding')
+    // refresh() first — see the note in sign-in/page.tsx. /post-auth is a server
+    // component and must not be rendered from the pre-sign-in router cache.
     router.refresh()
+    router.push('/post-auth')
   }
 
   async function onGoogle() {
@@ -57,7 +59,7 @@ export default function SignUpPage() {
     setPending(true)
     // Google returns email, name and picture only — the NGO fields are collected at
     // /onboarding instead.
-    await signIn.social({ provider: 'google', callbackURL: '/onboarding' })
+    await signIn.social({ provider: 'google', callbackURL: '/post-auth' })
   }
 
   return (

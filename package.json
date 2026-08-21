@@ -12,7 +12,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "auth:generate": "npx auth@latest generate"
+    "auth:generate": "npx auth@latest generate",
+    "db:encrypt-emails": "tsx src/db/encrypt-emails.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.1",
