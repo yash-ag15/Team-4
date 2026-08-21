@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
 
-import { ProjectsList } from './projects-list'
 
 export default async function DashboardPage() {
   // Middleware only checked for a cookie. This is the real authorization boundary.
@@ -26,8 +25,10 @@ export default async function DashboardPage() {
       </header>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-500">Projects</h2>
-        <ProjectsList />
+        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-500">Overview</h2>
+        <div className="rounded-lg border border-gray-200 p-6 text-sm text-gray-500">
+          Welcome to your Katalyst dashboard.
+        </div>
       </section>
     </main>
   )

@@ -13,9 +13,24 @@
  * Adding data: just append. Keep ids stable (`project-13`, …) — the seed upserts on them,
  * so changing an id orphans the previously seeded row instead of updating it.
  */
-import type { Project } from '@/contracts/projects'
-import type { Task } from '@/contracts/tasks'
 import type { User } from '@/contracts/users'
+
+export type Project = {
+  id: string
+  name: string
+  description: string
+  status: string
+  volunteerCount: number
+  createdAt: string
+}
+
+export type Task = {
+  id: string
+  projectId: string
+  title: string
+  done: boolean
+  createdAt: string
+}
 
 export const mockUsers: User[] = [
   {
