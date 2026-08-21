@@ -1,0 +1,272 @@
+import { eq, desc, and, sql } from 'drizzle-orm'
+import { randomUUID } from 'node:crypto'
+import type { z } from 'zod'
+
+import { ApiError } from '@/contracts/_kit'
+import type * as coursesContract from '@/contracts/courses'
+import { db } from '@/db'
+import { courses, courseSections, lessons, user } from '@/db/schema'
+import { applyTrack } from '@/lib/xp'
+
+export type Course = z.infer<typeof coursesContract.Course>
+export type CreateInput = z.infer<(typeof coursesContract.create)['input']>
+export type ListInput = z.infer<(typeof coursesContract.list)['input']>
+export type Section = z.infer<typeof coursesContract.Section>
+export type Lesson = z.infer<typeof coursesContract.Lesson>
+
+export async function createCourse(
+  input: CreateInput,
+  sessionUser?: { id: string; systemRole?: string | null } | null,
+): Promise<{ course: Course }> {
+  // Check if course with same slug already exists
+  const [existingSlug] = await db
+    .select({ id: courses.id })
+    .from(courses)
+    .where(eq(courses.slug, input.slug))
+    .limit(1)
+
+  if (existingSlug) {
+    throw new ApiError('CONFLICT', `A course with slug "${input.slug}" already exists`)
+  }
+
+  const mentorId = input.mentorId || sessionUser?.id
+  if (!mentorId) {
+    throw new ApiError('VALIDATION_ERROR', 'mentorId is required')
+  }
+
+  // Verify mentor exists in user table
+  const [mentorRow] = await db
+    .select({ id: user.id, name: user.name })
+    .from(user)
+    .where(eq(user.id, mentorId))
+    .limit(1)
+
+  if (!mentorRow) {
+    throw new ApiError('NOT_FOUND', `Mentor with id "${mentorId}" not found`)
+  }
+
+  const courseId = input.id || `course-${randomUUID().slice(0, 8)}`
+
+  const [inserted] = await db
+    .insert(courses)
+    .values({
+      id: courseId,
+      slug: input.slug,
+      title: input.title,
+      subtitle: input.subtitle ?? '',
+      description: input.description ?? '',
+      coverEmoji: input.coverEmoji ?? '📘',
+      category: input.category,
+      track: input.track ?? 'mandatory',
+      difficulty: input.difficulty ?? 'beginner',
+      certificateEligible: input.certificateEligible ?? false,
+      estimatedHours: input.estimatedHours ?? 0,
+      xpBonusOnComplete: input.xpBonusOnComplete ?? 100,
+      dueAt: input.dueAt ? new Date(input.dueAt) : null,
+      status: input.status ?? 'draft',
+      mentorId,
+    })
+    .returning()
+
+  if (!inserted) {
+    throw new ApiError('INTERNAL', 'Failed to create course')
+  }
+
+  const totalXp = applyTrack(inserted.xpBonusOnComplete, inserted.track)
+
+  return {
+    course: {
+      id: inserted.id,
+      slug: inserted.slug,
+      title: inserted.title,
+      subtitle: inserted.subtitle,
+      description: inserted.description,
+      coverEmoji: inserted.coverEmoji,
+      category: inserted.category as Course['category'],
+      track: inserted.track as Course['track'],
+      difficulty: inserted.difficulty as Course['difficulty'],
+      certificateEligible: inserted.certificateEligible,
+      estimatedHours: inserted.estimatedHours,
+      xpBonusOnComplete: inserted.xpBonusOnComplete,
+      totalXp,
+      dueAt: inserted.dueAt ? inserted.dueAt.toISOString() : null,
+      status: inserted.status as Course['status'],
+      mentorId: inserted.mentorId,
+      mentorName: mentorRow.name || 'Mentor',
+      sectionCount: 0,
+      lessonCount: 0,
+      enrolledCount: 0,
+      createdAt: inserted.createdAt.toISOString(),
+    },
+  }
+}
+
+export async function listCourses(
+  input: ListInput = {},
+  sessionUser?: { id: string; systemRole?: string | null } | null,
+): Promise<{ courses: Course[] }> {
+  const conditions = []
+  if (input.track) conditions.push(eq(courses.track, input.track))
+  if (input.category) conditions.push(eq(courses.category, input.category))
+  if (input.difficulty) conditions.push(eq(courses.difficulty, input.difficulty))
+
+  // Students and general users only ever see 'published' courses.
+  // Admins can see all or filter by requested status. Mentors can see their own courses.
+  if (sessionUser?.systemRole === 'admin') {
+    if (input.status) conditions.push(eq(courses.status, input.status))
+  } else if (sessionUser?.systemRole === 'mentor') {
+    if (input.status) {
+      conditions.push(sql`(${courses.status} = ${input.status} AND ${courses.mentorId} = ${sessionUser.id}) OR ${courses.status} = 'published'`)
+    } else {
+      conditions.push(sql`${courses.status} = 'published' OR ${courses.mentorId} = ${sessionUser.id}`)
+    }
+  } else {
+    // Standard student / user role: strictly published only
+    conditions.push(eq(courses.status, 'published'))
+  }
+
+  const rows = await db
+    .select({
+      course: courses,
+      mentorName: user.name,
+    })
+    .from(courses)
+    .leftJoin(user, eq(courses.mentorId, user.id))
+    .where(and(...conditions))
+    .orderBy(desc(courses.createdAt))
+    .limit(input.limit ?? 50)
+
+  const result: Course[] = rows.map(({ course: c, mentorName }) => {
+    const totalXp = applyTrack(c.xpBonusOnComplete, c.track)
+    return {
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      subtitle: c.subtitle,
+      description: c.description,
+      coverEmoji: c.coverEmoji,
+      category: c.category as Course['category'],
+      track: c.track as Course['track'],
+      difficulty: c.difficulty as Course['difficulty'],
+      certificateEligible: c.certificateEligible,
+      estimatedHours: c.estimatedHours,
+      xpBonusOnComplete: c.xpBonusOnComplete,
+      totalXp,
+      dueAt: c.dueAt ? c.dueAt.toISOString() : null,
+      status: c.status as Course['status'],
+      mentorId: c.mentorId,
+      mentorName: mentorName || '',
+      sectionCount: 0,
+      lessonCount: 0,
+      enrolledCount: 0,
+      createdAt: c.createdAt.toISOString(),
+    }
+  })
+
+  return { courses: result }
+}
+
+export async function getCourse(
+  slug: string,
+  sessionUser?: { id: string; systemRole?: string | null } | null,
+): Promise<{ course: Course; sections: Section[] }> {
+  const [courseRow] = await db
+    .select({
+      course: courses,
+      mentorName: user.name,
+    })
+    .from(courses)
+    .leftJoin(user, eq(courses.mentorId, user.id))
+    .where(eq(courses.slug, slug))
+    .limit(1)
+
+  if (!courseRow) {
+    throw new ApiError('NOT_FOUND', `Course with slug "${slug}" not found`)
+  }
+
+  const { course: c, mentorName } = courseRow
+
+  // If the course is not published, only an admin or the owning mentor can view it
+  if (c.status !== 'published') {
+    const isAuthorized =
+      sessionUser && (sessionUser.systemRole === 'admin' || sessionUser.id === c.mentorId)
+    if (!isAuthorized) {
+      throw new ApiError('NOT_FOUND', `Course with slug "${slug}" not found or is not published`)
+    }
+  }
+
+  // Fetch sections
+  const secRows = await db
+    .select()
+    .from(courseSections)
+    .where(eq(courseSections.courseId, c.id))
+    .orderBy(courseSections.orderIndex)
+
+  // Fetch lessons for all sections
+  const secIds = secRows.map((s) => s.id)
+  let lessonRows: (typeof lessons.$inferSelect)[] = []
+  if (secIds.length > 0) {
+    lessonRows = await db
+      .select()
+      .from(lessons)
+      .where(sql`${lessons.sectionId} IN ${secIds}`)
+      .orderBy(lessons.orderIndex)
+  }
+
+  const sections: Section[] = secRows.map((s) => ({
+    id: s.id,
+    courseId: s.courseId,
+    title: s.title,
+    summary: s.summary,
+    orderIndex: s.orderIndex,
+    xpAward: s.xpAward,
+    lessons: lessonRows
+      .filter((l) => l.sectionId === s.id)
+      .map((l) => ({
+        id: l.id,
+        sectionId: l.sectionId,
+        title: l.title,
+        kind: l.kind as Lesson['kind'],
+        contentUrl: l.contentUrl,
+        contentBody: l.contentBody,
+        durationMin: l.durationMin,
+        orderIndex: l.orderIndex,
+        xpAward: l.xpAward,
+      })),
+  }))
+
+  const lessonCount = lessonRows.length
+  const totalBaseXp =
+    c.xpBonusOnComplete +
+    secRows.reduce((acc, s) => acc + s.xpAward, 0) +
+    lessonRows.reduce((acc, l) => acc + l.xpAward, 0)
+
+  const totalXp = applyTrack(totalBaseXp, c.track)
+
+  return {
+    course: {
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      subtitle: c.subtitle,
+      description: c.description,
+      coverEmoji: c.coverEmoji,
+      category: c.category as Course['category'],
+      track: c.track as Course['track'],
+      difficulty: c.difficulty as Course['difficulty'],
+      certificateEligible: c.certificateEligible,
+      estimatedHours: c.estimatedHours,
+      xpBonusOnComplete: c.xpBonusOnComplete,
+      totalXp,
+      dueAt: c.dueAt ? c.dueAt.toISOString() : null,
+      status: c.status as Course['status'],
+      mentorId: c.mentorId,
+      mentorName: mentorName || '',
+      sectionCount: secRows.length,
+      lessonCount,
+      enrolledCount: 0,
+      createdAt: c.createdAt.toISOString(),
+    },
+    sections,
+  }
+}
