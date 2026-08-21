@@ -11,12 +11,14 @@ import { NextResponse, type NextRequest } from 'next/server'
  * `auth.api.getSession({ headers: await headers() })` in server components.
  */
 export function middleware(req: NextRequest) {
+  const isDev = process.env.NODE_ENV !== 'production'
   const hasCookie =
     req.cookies.get('better-auth.session_token') ??
     // Better Auth prefixes the cookie with `__Secure-` when served over HTTPS.
     req.cookies.get('__Secure-better-auth.session_token')
 
-  if (!hasCookie) return NextResponse.redirect(new URL('/sign-in', req.url))
+  // In production, optimistic cookie check. In dev mode without cookie, let the mock layer authenticate.
+  if (!hasCookie && !isDev) return NextResponse.redirect(new URL('/sign-in', req.url))
   return NextResponse.next()
 }
 

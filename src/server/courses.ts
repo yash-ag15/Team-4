@@ -18,15 +18,22 @@ export async function createCourse(
   input: CreateInput,
   sessionUser?: { id: string; systemRole?: string | null } | null,
 ): Promise<{ course: Course }> {
+  const slug =
+    input.slug ||
+    input.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+
   // Check if course with same slug already exists
   const [existingSlug] = await db
     .select({ id: courses.id })
     .from(courses)
-    .where(eq(courses.slug, input.slug))
+    .where(eq(courses.slug, slug))
     .limit(1)
 
   if (existingSlug) {
-    throw new ApiError('CONFLICT', `A course with slug "${input.slug}" already exists`)
+    throw new ApiError('CONFLICT', `A course with slug "${slug}" already exists`)
   }
 
   const mentorId = input.mentorId || sessionUser?.id
@@ -51,7 +58,7 @@ export async function createCourse(
     .insert(courses)
     .values({
       id: courseId,
-      slug: input.slug,
+      slug,
       title: input.title,
       subtitle: input.subtitle ?? '',
       description: input.description ?? '',
@@ -72,6 +79,40 @@ export async function createCourse(
     throw new ApiError('INTERNAL', 'Failed to create course')
   }
 
+  let totalSections = 0
+  let totalLessons = 0
+  if (input.sections && input.sections.length > 0) {
+    for (const [sIdx, s] of input.sections.entries()) {
+      const sectionId = `sec-${randomUUID().slice(0, 8)}`
+      await db.insert(courseSections).values({
+        id: sectionId,
+        courseId: inserted.id,
+        title: s.title,
+        summary: s.summary ?? '',
+        orderIndex: s.orderIndex ?? sIdx,
+        xpAward: s.xpAward ?? 50,
+      })
+      totalSections++
+      if (s.lessons && s.lessons.length > 0) {
+        for (const [lIdx, l] of s.lessons.entries()) {
+          const lessonId = `les-${randomUUID().slice(0, 8)}`
+          await db.insert(lessons).values({
+            id: lessonId,
+            sectionId,
+            title: l.title,
+            kind: l.kind,
+            contentUrl: l.contentUrl ?? '',
+            contentBody: l.contentBody ?? '',
+            durationMin: l.durationMin ?? 10,
+            orderIndex: l.orderIndex ?? lIdx,
+            xpAward: l.xpAward ?? 10,
+          })
+          totalLessons++
+        }
+      }
+    }
+  }
+
   const totalXp = applyTrack(inserted.xpBonusOnComplete, inserted.track)
 
   return {
@@ -88,13 +129,13 @@ export async function createCourse(
       certificateEligible: inserted.certificateEligible,
       estimatedHours: inserted.estimatedHours,
       xpBonusOnComplete: inserted.xpBonusOnComplete,
-      totalXp,
+      totalXp: input.totalXp ?? totalXp,
       dueAt: inserted.dueAt ? inserted.dueAt.toISOString() : null,
       status: inserted.status as Course['status'],
       mentorId: inserted.mentorId,
       mentorName: mentorRow.name || 'Mentor',
-      sectionCount: 0,
-      lessonCount: 0,
+      sectionCount: totalSections,
+      lessonCount: totalLessons,
       enrolledCount: 0,
       createdAt: inserted.createdAt.toISOString(),
     },

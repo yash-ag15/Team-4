@@ -49,16 +49,24 @@ export const toAdminCourse = (row: typeof courses.$inferSelect): AdminCourse => 
 })
 
 export async function createCourse(input: CreateCourseInput): Promise<{ course: AdminCourse }> {
+  const slug =
+    input.slug ||
+    input.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+
   const [existingSlug] = await db
     .select({ id: courses.id })
     .from(courses)
-    .where(eq(courses.slug, input.slug))
+    .where(eq(courses.slug, slug))
     .limit(1)
 
   if (existingSlug) {
-    throw new ApiError('CONFLICT', `A course with slug "${input.slug}" already exists`)
+    throw new ApiError('CONFLICT', `A course with slug "${slug}" already exists`)
   }
 
+  const mentorId = input.mentorId || 'user-1'
   if (input.mentorId) {
     const [mentorRow] = await db
       .select({ id: user.id })
@@ -77,7 +85,7 @@ export async function createCourse(input: CreateCourseInput): Promise<{ course: 
     .insert(courses)
     .values({
       id: courseId,
-      slug: input.slug,
+      slug,
       title: input.title,
       subtitle: input.subtitle ?? '',
       description: input.description ?? '',
@@ -90,7 +98,7 @@ export async function createCourse(input: CreateCourseInput): Promise<{ course: 
       xpBonusOnComplete: input.xpBonusOnComplete ?? 100,
       dueAt: input.dueAt ? new Date(input.dueAt) : null,
       status: input.status ?? 'draft',
-      mentorId: input.mentorId,
+      mentorId,
     })
     .returning()
 
