@@ -3,51 +3,50 @@
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
 
-import { api } from '@/lib/api-client'
-
-/**
- * Duplicated from `NGO_ROLES` in `@/lib/auth` on purpose — see the note in
- * `(auth)/sign-up/page.tsx`. A value import of the auth config would pull the DB driver
- * into the browser bundle.
- */
-const NGO_ROLES = ['volunteer', 'coordinator', 'donor', 'beneficiary', 'other'] as const
-type NgoRole = (typeof NGO_ROLES)[number]
+import { api, ApiClientError } from '@/lib/api-client'
 
 const inputClass =
   'rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900'
 
 export interface OnboardingDefaults {
-  ngoRole: NgoRole | string
-  organization: string
+  cohortYear: string
+  campus: string
   phone: string
   city: string
 }
 
 export function OnboardingForm({ defaults }: { defaults: OnboardingDefaults }) {
   const router = useRouter()
-  const [ngoRole, setNgoRole] = useState<NgoRole>(
-    (NGO_ROLES as readonly string[]).includes(defaults.ngoRole)
-      ? (defaults.ngoRole as NgoRole)
-      : 'volunteer',
-  )
-  const [organization, setOrganization] = useState(defaults.organization)
+  const [cohortYear, setCohortYear] = useState(defaults.cohortYear)
+  const [campus, setCampus] = useState(defaults.campus)
   const [phone, setPhone] = useState(defaults.phone)
   const [city, setCity] = useState(defaults.city)
+  const [showMentorCode, setShowMentorCode] = useState(false)
+  const [mentorCode, setMentorCode] = useState('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    setErrors({})
     setPending(true)
 
     try {
-      // `onboardingComplete` is deliberately NOT sent — the server handler sets it.
-      await api.users.completeOnboarding({ ngoRole, organization, phone, city })
+      await api.users.completeOnboarding({ cohortYear, campus, phone, city, mentorCode })
       router.push('/dashboard')
       router.refresh()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save your profile')
+      if (e instanceof ApiClientError && e.fields) {
+        const newErrors: Record<string, string> = {}
+        for (const [k, msgs] of Object.entries(e.fields)) {
+          newErrors[k] = msgs[0]
+        }
+        setErrors(newErrors)
+      } else {
+        setError(e instanceof Error ? e.message : 'Could not save your profile')
+      }
       setPending(false)
     }
   }
@@ -65,31 +64,33 @@ export function OnboardingForm({ defaults }: { defaults: OnboardingDefaults }) {
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Your role</span>
+          <span className="text-sm font-medium">Cohort Year</span>
           <select
-            name="ngoRole"
-            value={ngoRole}
-            onChange={(e) => setNgoRole(e.target.value as NgoRole)}
+            name="cohortYear"
+            value={cohortYear}
+            onChange={(e) => setCohortYear(e.target.value)}
             className={inputClass}
+            required
           >
-            {NGO_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {role[0].toUpperCase() + role.slice(1)}
-              </option>
-            ))}
+            <option value="" disabled>Select cohort year</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
           </select>
+          {errors.cohortYear && <span className="text-xs text-red-500">{errors.cohortYear}</span>}
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Organization</span>
+          <span className="text-sm font-medium">Campus</span>
           <input
             type="text"
-            name="organization"
-            autoComplete="organization"
-            value={organization}
-            onChange={(e) => setOrganization(e.target.value)}
+            name="campus"
+            value={campus}
+            onChange={(e) => setCampus(e.target.value)}
             className={inputClass}
           />
+          {errors.campus && <span className="text-xs text-red-500">{errors.campus}</span>}
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -102,6 +103,7 @@ export function OnboardingForm({ defaults }: { defaults: OnboardingDefaults }) {
             onChange={(e) => setPhone(e.target.value)}
             className={inputClass}
           />
+          {errors.phone && <span className="text-xs text-red-500">{errors.phone}</span>}
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -114,12 +116,38 @@ export function OnboardingForm({ defaults }: { defaults: OnboardingDefaults }) {
             onChange={(e) => setCity(e.target.value)}
             className={inputClass}
           />
+          {errors.city && <span className="text-xs text-red-500">{errors.city}</span>}
         </label>
+
+        <div className="flex flex-col gap-2 rounded-md border border-gray-200 p-4 mt-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showMentorCode}
+              onChange={(e) => setShowMentorCode(e.target.checked)}
+              className="rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+            />
+            <span className="text-sm font-medium text-gray-700">I'm a mentor</span>
+          </label>
+          {showMentorCode && (
+            <label className="flex flex-col gap-1.5 mt-2">
+              <span className="text-sm font-medium">Mentor Code</span>
+              <input
+                type="text"
+                name="mentorCode"
+                value={mentorCode}
+                onChange={(e) => setMentorCode(e.target.value)}
+                className={inputClass}
+                placeholder="Enter mentor code"
+              />
+            </label>
+          )}
+        </div>
 
         <button
           type="submit"
           disabled={pending}
-          className="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+          className="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 mt-4"
         >
           {pending ? 'Saving…' : 'Continue'}
         </button>

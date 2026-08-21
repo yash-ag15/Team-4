@@ -1,6 +1,15 @@
 import { drizzle } from 'drizzle-orm/neon-serverless'
+import { Pool, neonConfig } from '@neondatabase/serverless'
+import { loadEnvConfig } from '@next/env'
+import ws from 'ws'
+
+loadEnvConfig(process.cwd())
 
 import * as schema from './schema'
+
+neonConfig.webSocketConstructor = ws
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
 /**
  * Neon WebSocket driver — NOT `drizzle-orm/neon-http`.
@@ -13,4 +22,5 @@ import * as schema from './schema'
  * Node runtime only. Never add `export const runtime = 'edge'` to anything that imports
  * this module.
  */
-export const db = drizzle(process.env.DATABASE_URL!, { schema })
+export const db = drizzle({ client: pool, schema })
+

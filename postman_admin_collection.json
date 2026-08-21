@@ -1,0 +1,349 @@
+{
+  "info": {
+    "_postman_id": "katalyst-admin-api-v1",
+    "name": "Katalyst - Admin Backend APIs",
+    "description": "Complete Admin API contracts for Katalyst platform. Includes Reports, Users, Students, Evaluations, Modules, and Tasks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Reports & Metrics",
+      "item": [
+        {
+          "name": "GET /api/admin/report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/report?cohortYear=2026&track=mandatory&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "report"],
+              "query": [
+                { "key": "cohortYear", "value": "2026" },
+                { "key": "track", "value": "mandatory" },
+                { "key": "limit", "value": "50" }
+              ]
+            },
+            "description": "Consolidated admin cohort and engagement report with totals."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Users & Roles",
+      "item": [
+        {
+          "name": "GET /api/admin/users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?role=student&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                { "key": "role", "value": "student" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "List users with role filtering."
+          }
+        },
+        {
+          "name": "POST /api/admin/users/:id/role",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"mentor\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/user-student-1/role",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "user-student-1", "role"]
+            },
+            "description": "Promote or change user system role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Student Management & Performance",
+      "item": [
+        {
+          "name": "GET /api/admin/students",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/students?cohortYear=2026&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "students"],
+              "query": [
+                { "key": "cohortYear", "value": "2026" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Get student roster with aggregates and intervention flags."
+          }
+        },
+        {
+          "name": "GET /api/admin/students/:userId/performance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/students/user-student-1/performance",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "students", "user-student-1", "performance"]
+            },
+            "description": "Aggregated performance breakdown for a student."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Evaluation Monitoring",
+      "item": [
+        {
+          "name": "GET /api/admin/evaluations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/evaluations?status=mentor_approved&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "evaluations"],
+              "query": [
+                { "key": "status", "value": "mentor_approved" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Monitor AI and mentor evaluations across all submissions."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Learning Modules",
+      "item": [
+        {
+          "name": "POST /api/admin/modules",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Data Structures & Algorithms\",\n  \"description\": \"Master trees, graphs, and dynamic programming.\",\n  \"difficulty\": \"intermediate\",\n  \"durationMin\": 180,\n  \"category\": \"technical\",\n  \"track\": \"mandatory\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules"]
+            },
+            "description": "Admin creates a learning module/course."
+          }
+        },
+        {
+          "name": "GET /api/admin/modules",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules?status=published",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules"],
+              "query": [
+                { "key": "status", "value": "published" }
+              ]
+            },
+            "description": "Admin lists modules."
+          }
+        },
+        {
+          "name": "GET /api/admin/modules/:id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules/module-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules", "module-1"]
+            },
+            "description": "Admin gets module by ID."
+          }
+        },
+        {
+          "name": "PUT /api/admin/modules/:id",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Advanced Data Structures & Algorithms\",\n  \"status\": \"published\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules/module-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules", "module-1"]
+            },
+            "description": "Admin updates module."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Task Management (XP & Evaluation Config)",
+      "item": [
+        {
+          "name": "POST /api/admin/modules/:moduleId/tasks",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Explain ACID Properties with Practical Transactions\",\n  \"description\": \"Explain all four ACID properties with realistic SQL transaction examples.\",\n  \"xp\": 50,\n  \"maxMarks\": 100,\n  \"evaluationCriteria\": [\n    {\n      \"name\": \"Understanding\",\n      \"description\": \"Accurate explanation of ACID properties\",\n      \"weight\": 40\n    },\n    {\n      \"name\": \"Examples\",\n      \"description\": \"Realistic and syntactically correct transaction code\",\n      \"weight\": 30\n    },\n    {\n      \"name\": \"Clarity\",\n      \"description\": \"Clear structured explanation\",\n      \"weight\": 30\n    }\n  ],\n  \"taskData\": {\n    \"topic\": \"DBMS\",\n    \"difficulty\": \"medium\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules/module-1/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules", "module-1", "tasks"]
+            },
+            "description": "Admin creates a task with evaluation criteria and XP."
+          }
+        },
+        {
+          "name": "GET /api/admin/modules/:moduleId/tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/modules/module-1/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "modules", "module-1", "tasks"]
+            },
+            "description": "Admin lists tasks for a module."
+          }
+        },
+        {
+          "name": "GET /api/admin/tasks/:taskId",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-mock",
+                "value": "1"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tasks/task-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tasks", "task-1"]
+            },
+            "description": "Admin gets task details with evaluation criteria."
+          }
+        },
+        {
+          "name": "PUT /api/admin/tasks/:taskId",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"xp\": 75,\n  \"maxMarks\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tasks/task-1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tasks", "task-1"]
+            },
+            "description": "Admin updates task configuration."
+          }
+        },
+        {
+          "name": "PATCH /api/admin/tasks/:taskId/status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "x-mock", "value": "1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"inactive\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tasks/task-1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tasks", "task-1", "status"]
+            },
+            "description": "Admin activates or deactivates a task without deleting history."
+          }
+        }
+      ]
+    }
+  ]
+}

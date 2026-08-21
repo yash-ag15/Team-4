@@ -1,4 +1,7 @@
 import { defineConfig } from 'drizzle-kit'
+import { loadEnvConfig } from '@next/env'
+
+loadEnvConfig(process.cwd())
 
 /**
  * `drizzle-kit push` is BANNED on this project — the database is shared by the whole
