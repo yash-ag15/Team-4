@@ -311,3 +311,42 @@ export async function getCourse(
     sections,
   }
 }
+
+export async function listMentorCourses(
+  sessionUser?: { id: string; systemRole?: string | null } | null,
+): Promise<{
+  courses: {
+    id: string
+    title: string
+    track: Course['track']
+    enrolledCount: number
+    avgProgressPct: number
+    completionRate: number
+  }[]
+}> {
+  const mentorId = sessionUser?.id
+  const conditions = mentorId && sessionUser?.systemRole !== 'admin'
+    ? [eq(courses.mentorId, mentorId)]
+    : []
+
+  const courseRows = await db
+    .select({
+      id: courses.id,
+      title: courses.title,
+      track: courses.track,
+    })
+    .from(courses)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(courses.createdAt))
+
+  return {
+    courses: courseRows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      track: c.track as Course['track'],
+      enrolledCount: 0,
+      avgProgressPct: 0,
+      completionRate: 0,
+    })),
+  }
+}

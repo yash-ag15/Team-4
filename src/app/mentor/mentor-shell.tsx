@@ -13,6 +13,7 @@ export function MentorShell({ children }: MentorShellProps) {
 
   const navLinks = [
     { href: '/mentor/dashboard', label: 'Dashboard' },
+    { href: '/mentor/admin/courses/new', label: 'Create Course' },
     { href: '/mentor/students', label: 'Students Roster' },
     { href: '/mentor/review', label: 'Review Queue' },
     { href: '/mentor/admin/reports', label: 'Reports & KPIs' },
@@ -64,6 +65,13 @@ export function MentorShell({ children }: MentorShellProps) {
 
           {/* Right Action */}
           <div className="flex items-center gap-3">
+            <Link
+              href="/mentor/admin/courses/new"
+              className="bg-gradient-to-r from-[#2596be] to-[#38bdf8] hover:from-[#1e7898] hover:to-[#0284c7] text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5"
+            >
+              <span>+</span>
+              <span>Create Course</span>
+            </Link>
             <Link
               href="/dashboard"
               className="text-xs font-semibold text-slate-700 hover:text-[#2596be] px-3.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 hover:border-[#2596be]/40 transition shadow-xs flex items-center gap-1.5"

@@ -397,11 +397,20 @@ export default function MentorDashboardPage() {
 
           {/* Right 1 Col: My Courses Summary */}
           <div className="bg-white rounded-3xl p-6 lg:p-7 border border-slate-200/80 shadow-sm space-y-5">
-            <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-lg font-bold text-slate-900 font-['Hanken_Grotesk']">
-                My Courses
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">Roster & completion summary</p>
+            <div className="border-b border-slate-100 pb-4 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 font-['Hanken_Grotesk']">
+                  My Courses
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">Roster & completion summary</p>
+              </div>
+              <Link
+                href="/mentor/admin/courses/new"
+                className="text-xs font-bold text-[#2596be] hover:text-[#ec4899] bg-[#2596be]/10 hover:bg-[#ec4899]/10 px-2.5 py-1 rounded-lg border border-[#2596be]/20 transition-all flex items-center gap-1"
+              >
+                <span>+</span>
+                <span>New Course</span>
+              </Link>
             </div>
 
             <div className="space-y-4">
