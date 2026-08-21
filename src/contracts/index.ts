@@ -3,6 +3,7 @@
 import * as projects from './projects'
 import * as tasks from './tasks'
 import * as users from './users'
+import * as enrollments from './enrollments'
 
-export const contracts = { projects, tasks, users }
+export const contracts = { projects, tasks, users, enrollments }
 export type Contracts = typeof contracts
