@@ -31,7 +31,7 @@ export const RubricLine = z.object({
   maxScore: z.number().int(), comment: z.string(),
 })
 
-// This exact object is passed to zodOutputFormat() in the model call.
+// This exact object becomes the responseJsonSchema in the model call.
 // One definition -> the model cannot return a shape the UI does not expect.
 export const AiReviewPayload = z.object({
   summary: z.string(),
@@ -87,12 +87,12 @@ The model still *sees* `xpAward` in the prompt so its prose matches the number.
 
 ## Definition of done
 
-- [ ] One real `messages.parse` call returns a schema-valid `AiReviewPayload` — **by T+1:30**
+- [ ] One real `generateJson()` call returns a schema-valid `AiReviewPayload` — **by T+1:30**
 - [ ] `preview` returns a review for a pasted draft in under 25 s
 - [ ] `review` persists `ai_reviews`, sets `submissions.status = 'ai_reviewed'` and the two
       denormalised columns
 - [ ] `brief` renders on the dashboard and is cached per user per hour
-- [ ] With no `ANTHROPIC_API_KEY` every endpoint returns the mock, `source: 'mock'`, no throw
-- [ ] `stop_reason === 'refusal'` and `parsed_output === null` are both handled
+- [ ] With no `GEMINI_API_KEY` every endpoint returns the mock, `source: 'mock'`, no throw
+- [ ] a safety block (`finishReason !== 'STOP'`) and a failed `safeParse` are both handled
 - [ ] `export const maxDuration = 60` on all three route files
 - [ ] `grep -rn "awardXp\|xpEvents" src/server/ai-coach.ts` returns **nothing**

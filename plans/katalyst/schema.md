@@ -186,7 +186,7 @@ Only the `mentor_approved` transition writes an `xp_event`.
 |---|---|---|
 | `id` | text PK | |
 | `submissionId` | text → submissions (cascade) | |
-| `model` | text | `claude-opus-5` — recorded so we can show it in the demo |
+| `model` | text | `gemini-2.5-flash` — recorded so we can show it in the demo |
 | `summary` | text | 2-3 sentences the student reads first |
 | `strengths` | jsonb `string[]` | |
 | `weaknesses` | jsonb `string[]` | |

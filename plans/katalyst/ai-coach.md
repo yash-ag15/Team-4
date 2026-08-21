@@ -42,8 +42,8 @@ If a code review finds an AI code path that awards XP, it is a bug, not a shortc
 ## 3. The output schema — defined once, used three times
 
 The zod object lives in `src/contracts/ai-coach.ts` and is used for (a) the contract's
-`output`, (b) the mock, and (c) `zodOutputFormat()` in the model call. One definition means
-the model literally cannot return a shape the frontend does not expect.
+`output`, (b) the mock, and (c) the `responseJsonSchema` sent to the model. One definition
+means the model literally cannot return a shape the frontend does not expect.
 
 ```ts
 export const RubricLine = z.object({
@@ -53,6 +53,7 @@ export const RubricLine = z.object({
   comment: z.string(),
 })
 
+// What the MODEL returns. Note: no suggestedXp, no ids, no timestamps.
 export const AiReviewPayload = z.object({
   summary: z.string(),                    // 2-3 sentences, addressed to the student
   strengths: z.array(z.string()).min(1),  // specific, quoting their work
@@ -60,17 +61,20 @@ export const AiReviewPayload = z.object({
   actionItems: z.array(z.string()).min(1),// concrete next steps
   rubricBreakdown: z.array(RubricLine),
   suggestedScore: z.number().int(),       // out of assessment.maxScore
-  suggestedXp: z.number().int(),          // advice — never written to xp_events
   confidence: z.enum(['low', 'medium', 'high']),
 })
+
+// What the API returns: the payload plus the computed XP and the card metadata.
+export const AiReview = AiReviewPayload.extend({ /* suggestedXp, maxScore, track, model, ... */ })
 ```
 
-`suggestedXp` is computed **in code**, not by the model, from the model's `suggestedScore`:
+**`suggestedXp` is computed in code, not by the model** — that is why it is absent from
+`AiReviewPayload`:
 
 ```ts
-const suggestedXp = Math.round(
-  assessment.xpAward * (suggestedScore / assessment.maxScore) * trackMultiplier,
-)
+// src/lib/xp.ts
+export const suggestedXpFromScore = (score, maxScore, xpAward, track) =>
+  maxScore <= 0 ? 0 : applyTrack(xpAward * (score / maxScore), track)
 ```
 
 Letting the model pick the XP number invites it to be inconsistent with the score it just
@@ -81,63 +85,73 @@ prompt so its narrative ("this looks like about 120 XP") matches.
 
 ## 4. The model call
 
-```ts
-// src/lib/anthropic.ts — the only place the SDK is constructed
-import Anthropic from '@anthropic-ai/sdk'
+**Provider: Google Gemini, free tier.** Get a key at <https://aistudio.google.com/apikey>.
+We are not on Anthropic — its API is pay-as-you-go with no free tier and we had no credits.
 
-export const anthropic = new Anthropic()      // reads ANTHROPIC_API_KEY
-export const AI_MODEL = 'claude-opus-5'
-export const aiEnabled = () => Boolean(process.env.ANTHROPIC_API_KEY)
+**Nothing outside `src/lib/ai.ts` imports an LLM SDK.** That is what made the provider
+switch a one-file change with zero edits to any contract.
+
+```ts
+// src/lib/ai.ts — the only place @google/genai is imported
+import { GoogleGenAI } from '@google/genai'
+
+export const AI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+export const aiEnabled = () => Boolean(process.env.GEMINI_API_KEY)
+
+// LAZY — an eager module-scope client reads process.env before loadEnvConfig() runs in
+// scripts, captures an empty key, and then fails while aiEnabled() still returns true.
+export const getAI = () => (client ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }))
+
+export async function generateJson<T extends z.ZodTypeAny>(opts: {
+  system: string; prompt: string; schema: T
+}): Promise<{ data: z.infer<T>; model: string; latencyMs: number; tokensIn: number; tokensOut: number }>
 ```
+
+Callers are provider-agnostic:
 
 ```ts
 // src/server/ai-coach.ts
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import { anthropic, AI_MODEL, aiEnabled } from '@/lib/anthropic'
-import { COACH_SYSTEM_PROMPT, buildReviewPrompt } from '@/lib/ai-prompts'
-import { AiReviewPayload } from '@/contracts/ai-coach'
-
-const started = Date.now()
-
-const res = await anthropic.messages.parse({
-  model: AI_MODEL,
-  max_tokens: 16000,
+const res = await generateJson({
   system: COACH_SYSTEM_PROMPT,
-  messages: [{ role: 'user', content: buildReviewPrompt({ assessment, course, submission, history }) }],
-  output_config: {
-    format: zodOutputFormat(AiReviewPayload),
-    effort: 'medium',   // bump to 'high' if reviews read generic; 'low' if we are timing out
-  },
+  prompt: buildReviewPrompt({ course, assessment, content, history, isPreview }),
+  schema: AiReviewPayload,   // the SAME zod object the contract exports
 })
-
-if (res.stop_reason === 'refusal') throw new ApiError('INTERNAL', 'The coach could not review this submission.')
-const payload = res.parsed_output
-if (!payload) throw new ApiError('INTERNAL', 'The coach returned an unreadable review.')
+const payload = res.data     // already validated — generateJson never returns raw output
 ```
+
+Internally `generateJson` sets `responseMimeType: 'application/json'` and
+`responseJsonSchema: z.toJSONSchema(schema)` (sanitised — `$schema` and zod's ±2^53 integer
+bounds are stripped, because a bloated schema measurably degrades adherence), then
+`JSON.parse` + `schema.safeParse`.
 
 ### Rules that will otherwise cost an hour
 
 - **`export const maxDuration = 60`** on every `api/ai-coach/*` route file. The default
-  Vercel Function timeout will kill a 25-second review.
-- **No `budget_tokens`.** It is a 400 on `claude-opus-5`; thinking is adaptive by default.
-- **No assistant prefill.** Also a 400 on `claude-opus-5`.
-- **`parsed_output` can be `null`.** Guard it; do not `!`-assert it into a DB write.
-- **Do not stream.** A route handler returns one JSON envelope. Streaming buys nothing here
-  and breaks the contract layer.
-- Record `latencyMs`, `usage.input_tokens`, `usage.output_tokens` on the `ai_reviews` row.
-  Showing "reviewed by claude-opus-5 in 14.2 s" on the card is a free credibility point.
+  Vercel Function timeout will kill a slow review.
+- **Structured output is not a guarantee.** It reduces malformed responses; it does not
+  eliminate them. The `safeParse` inside `generateJson` is the actual contract enforcement.
+  Never hand a caller unvalidated model output.
+- **Safety filters and truncation arrive as a `finishReason`, not an exception.** Check
+  `candidates[0].finishReason !== 'STOP'` before reading the text. `MAX_TOKENS` means the
+  JSON was cut off mid-object and will not parse.
+- **The free tier is rate-limited per minute AND per day.** A 429 must degrade to "the
+  coach is busy", never a 500 — by then the submission is already saved.
+- Record `latencyMs`, `tokensIn`, `tokensOut` on the `ai_reviews` row. Showing
+  "reviewed by gemini-2.5-flash in 6.2 s" on the card is a free credibility point.
+- `GEMINI_MODEL` overrides the model without a code change.
+  `npm run ai:smoke -- --list` shows what your key can actually reach.
 
 ### The no-key fallback — this is what keeps six people unblocked
 
 ```ts
 if (!aiEnabled()) {
-  console.warn('[ai-coach] ANTHROPIC_API_KEY missing — serving the contract mock')
+  console.warn('[ai-coach] GEMINI_API_KEY missing — serving the contract mock')
   return contract.mock(input)
 }
 ```
 
-Riya builds the entire review UI against this before the key exists. The frontend never
-knows the difference; `source` on the envelope tells the truth.
+Riya builds the entire review UI against this before any key exists. The frontend never
+knows the difference; `source` on the envelope and `model` on the card tell the truth.
 
 ---
 
@@ -218,8 +232,8 @@ Guard rails Yash adds in Wave 3: a per-user rate limit (5 previews / 10 minutes)
 | No API key | The mock review, `source: 'mock'`, MockBadge visible |
 | `RateLimitError` | "The coach is busy — try again in a minute." Submission still saved. |
 | Timeout / `APIConnectionError` | Same message. **The submission is saved first, reviewed second** — never lose a student's work because the coach was slow. |
-| `stop_reason === 'refusal'` | "The coach could not review this submission." Goes to the mentor queue **without** an AI review; the mentor grades manually. |
-| `parsed_output === null` | Same as refusal. Log the raw response. |
+| `finishReason !== 'STOP'` (safety block) | "The coach could not review this submission." Goes to the mentor queue **without** an AI review; the mentor grades manually. |
+| response is not valid JSON, or fails `safeParse` | Same as a block. The raw text is logged. |
 
 **Ordering rule:** `submissions` row is inserted and committed **before** the model call.
 The review is an enrichment, not a precondition. Ayush owns that ordering in
@@ -250,13 +264,13 @@ Every one of these is built against `contract.mock` in Wave 1, before the pipeli
 | When | Yash | Riya |
 |---|---|---|
 | T+0:20 | contract + mock already landed | read `assessments.rubric`, write the system prompt |
-| T+0:20-1:30 | `lib/anthropic.ts`, one real `messages.parse` returning a valid payload — **prove the call works before building around it** | `buildReviewPrompt`, then `ReviewCard` + `PredictedScore` against the mock |
+| T+0:20-1:30 | `lib/ai.ts`, one real `generateJson()` returning a valid payload — **prove the call works before building around it** | `buildReviewPrompt`, then `ReviewCard` + `PredictedScore` against the mock |
 | T+1:30-2:15 | `review()` with persist, `preview()` without | `StrengthsWeaknesses`, `RubricTable`, `ActionItems` |
 | T+2:15-3:00 | `brief()` + cache; wire `review()` into `submissions.create()` with Ayush | `src/server/mentor.ts` → queue + `decide()`; `/mentor/review` page |
 | **Gate B — T+3:00** | **the full round-trip runs on the deployed URL** | |
 | T+3:00-4:15 | rate limit, caps, failure ladder | `CoachBrief` on the dashboard, nudge copy, demo script |
 
 **The single most important checkpoint in the whole six hours is Yash getting one real
-`messages.parse` call to return a schema-valid `AiReviewPayload` before T+1:30.** Everything
+`generateJson()` call to return a schema-valid `AiReviewPayload` before T+1:30.** Everything
 downstream is plumbing. If the key is missing or the SDK call is wrong, we need to know at
 minute 90, not at minute 200.
