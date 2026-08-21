@@ -19,7 +19,7 @@ export type Project = {
   id: string
   name: string
   description: string
-  status: string
+  status: 'active' | 'draft' | 'archived' | string
   volunteerCount: number
   createdAt: string
 }
