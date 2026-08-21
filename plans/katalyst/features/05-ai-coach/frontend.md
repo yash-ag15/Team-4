@@ -26,7 +26,7 @@ Not: `Evidence — is there evidence?`
 
 | # | Component | What it shows | Est |
 |---|---|---|---|
-| 3 | `ReviewCard` | Container. Header: `claude-opus-5 · 14.2s · confidence: high`, and the line **"This is the AI Coach's assessment. Your mentor makes the final call."** | 20 m |
+| 3 | `ReviewCard` | Container. Header: `gemini-2.5-flash · 6.2s · confidence: high`, and the line **"This is the AI Coach's assessment. Your mentor makes the final call."** | 20 m |
 | 4 | `PredictedScore` | The hero. `82 / 100` as a ring, and below it **`≈ 120 XP`** with a `1.5x` chip on optional courses. **This is the pitch-deck screenshot.** | 25 m |
 | 5 | `StrengthsWeaknesses` | Two columns, green ✓ and amber ⚠, one sentence each | 15 m |
 | 6 | `ActionItems` | A checklist. Ticking is local-only — a nudge, not state. | 10 m |

@@ -54,8 +54,8 @@ output: z.object({
 })
 ```
 
-Same machinery as the review: `anthropic.messages.parse` +
-`zodOutputFormat(CourseDraft)`, `effort: 'medium'`, `maxDuration = 60`, mock fallback with
+Same machinery as the review: `generateJson({ schema: CourseDraft })`,
+`maxDuration = 60`, mock fallback with
 no key. A different prompt and a different schema; nothing else is new.
 
 ---

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from './types';
 import { ThemeToggle } from './theme-toggle';
+import { SignOutButton } from '@/components/auth/sign-out-button';
 
 interface NavbarProps {
   user: UserProfile;
@@ -128,6 +129,9 @@ export function Navbar({ user, onSearch }: NavbarProps) {
                 {user.name ? user.name.charAt(0) : 'U'}
               </div>
             </div>
+
+            {/* Sign out */}
+            <SignOutButton className="text-xs font-semibold text-on-surface-variant hover:text-error transition-colors px-2.5 py-1 rounded-full border border-outline-variant hover:border-error/50 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 whitespace-nowrap" />
           </div>
         </div>
       </header>
@@ -172,6 +176,8 @@ export function Navbar({ user, onSearch }: NavbarProps) {
             <span className="material-symbols-outlined text-xl">notifications</span>
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border border-background"></span>
           </button>
+
+          <SignOutButton label="Exit" className="text-[11px] font-bold text-on-surface-variant hover:text-error transition-colors px-2 py-1 rounded-full border border-outline-variant disabled:opacity-50" />
         </div>
       </header>
 

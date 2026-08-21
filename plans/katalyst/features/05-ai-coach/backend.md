@@ -20,9 +20,9 @@ stubbing against it.
 
 | # | Task | Files | Est |
 |---|---|---|---|
-| 4 | `npm i @anthropic-ai/sdk`; `src/lib/anthropic.ts` with `anthropic`, `AI_MODEL = 'claude-opus-5'`, `aiEnabled()` | `src/lib/anthropic.ts` | 5 m |
-| 5 | **One real `messages.parse` call with `zodOutputFormat(AiReviewPayload)` returning a valid object.** Hardcode an assessment and a submission. Print the result. | scratch | 25 m |
-| 6 | If it fails: check the key, check `output_config.format` shape, check no `budget_tokens` and no prefill. Do not proceed until it works. | — | — |
+| 4 | `npm i @google/genai`; `src/lib/ai.ts` with `getAI()` (LAZY), `AI_MODEL`, `aiEnabled()`, `generateJson()` | `src/lib/ai.ts` | 5 m |
+| 5 | **One real `generateJson({ schema: AiReviewPayload })` call returning a valid object.** Use `npm run ai:smoke` — it is already written and hits no database. | scratch | 25 m |
+| 6 | If it fails: `npm run ai:smoke -- --list` to check the model name, check .env.local for a stray `=`, check the free-tier quota. Do not proceed until it works. | — | — |
 
 **This is the single most important 40 minutes in the six hours.** Everything downstream is
 plumbing. Find out at minute 90 that the key is wrong, not at minute 200.
@@ -43,7 +43,7 @@ plumbing. Find out at minute 90 that the key is wrong, not at minute 200.
 | # | Task | Est |
 |---|---|---|
 | 13 | `buildBriefContext(userId)` — XP summary, per-course progress, streak, overdue, last 5 review summaries | 20 m |
-| 14 | `brief()` with `zodOutputFormat(CoachBrief)` | 15 m |
+| 14 | `brief()` with `generateJson({ schema: CoachBrief })` | 15 m |
 | 15 | Cache: a module-level `Map<userId, { at, brief }>` with a 1-hour TTL. **Vercel Functions are stateless — a cold start loses it, and that is fine.** Do not build a cache table. | 10 m |
 
 ## T+3:00 → T+4:15 — harden
@@ -60,25 +60,23 @@ plumbing. Find out at minute 90 that the key is wrong, not at minute 200.
 ## The call, verbatim
 
 ```ts
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
+import { generateJson } from '@/lib/ai'
+import { AiReviewPayload } from '@/contracts/ai-coach'
 
-const started = Date.now()
-const res = await anthropic.messages.parse({
-  model: AI_MODEL,
-  max_tokens: 16000,
+const res = await generateJson({
   system: COACH_SYSTEM_PROMPT,
-  messages: [{ role: 'user', content: buildReviewPrompt(ctx) }],
-  output_config: { format: zodOutputFormat(AiReviewPayload), effort: 'medium' },
+  prompt: buildReviewPrompt(ctx),
+  schema: AiReviewPayload,   // the SAME zod object the contract exports
 })
-const latencyMs = Date.now() - started
 
-if (res.stop_reason === 'refusal') throw new ApiError('INTERNAL', 'The coach could not review this submission.')
-const payload = res.parsed_output
-if (!payload) throw new ApiError('INTERNAL', 'The coach returned an unreadable review.')
+// res.data is ALREADY validated against AiReviewPayload — generateJson throws AiError
+// rather than ever returning unvalidated model output.
+const payload = res.data
 ```
 
-**Do not** add `budget_tokens` (400 on `claude-opus-5`), an assistant prefill (400), or
-streaming (breaks the envelope). Thinking is adaptive by default — leave it alone.
+Provider specifics (Gemini, , , 429 handling) all live
+inside . Do NOT import  here — that is the boundary that let
+us swap provider in one file with zero contract changes.
 
-If reviews are timing out, in this order: drop `history` from the prompt → `effort: 'low'`
-→ shorten the rubric echo. Do **not** drop the rubric.
+If reviews are timing out, in this order: drop  from the prompt → lower
+ → try a faster . Do **not** drop the rubric.

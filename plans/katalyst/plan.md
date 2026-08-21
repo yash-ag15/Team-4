@@ -20,7 +20,7 @@ they are built after the spine works, not before.
 
 | Person | Primary role | Owns |
 |---|---|---|
-| **Yash** | Backend lead — AI Coach + XP engine | `ai-coach`, `xp`, `lib/anthropic.ts`, `lib/xp.ts` |
+| **Yash** | Backend lead — AI Coach + XP engine | `ai-coach`, `xp`, `lib/ai.ts`, `lib/xp.ts` |
 | **Riya** | AI Coach — prompts, rubric, mentor review | `mentor`, `lib/ai-prompts.ts`, `components/ai/*`, mentor review page |
 | **Siddesh** | Database developer + course authoring | `db/schema/*`, migrations, seed, `courses`, `admin` |
 | **Ayush** | Backend — enrolment, progress, submissions | `enrollments`, `progress`, `submissions` |
@@ -78,9 +78,9 @@ Two people drive; the other five set up and watch.
 4. Push. **From here on, only Siddesh runs `db:migrate`.**
 
 **Samya** (parallel)
-1. `npm i @anthropic-ai/sdk`.
+1. `npm i @google/genai`.
 2. Vercel project, env vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
-   `GOOGLE_*`, `ANTHROPIC_API_KEY`, `MENTOR_SIGNUP_CODE`), production Google callback URL.
+   `GOOGLE_*`, `GEMINI_API_KEY`, `MENTOR_SIGNUP_CODE`), production Google callback URL.
 3. **Deploy hello-world.** Post the URL in the channel.
 
 **Everyone else**: clone, `npm i`, copy `.env.example` → `.env.local`, `npm run dev`, open
@@ -103,7 +103,7 @@ Everything is mocked, so frontend and backend genuinely run in parallel.
 | **Samya** | `src/lib/auth.ts` additionalFields are Siddesh's; you own `/sign-in`, `/sign-up`, `/onboarding` (role + cohort + campus + optional mentor code), `middleware.ts` matchers for `(student)`/`(mentor)`, `AppShell` + role-aware nav, `src/server/users.ts` live. |
 | **Siddesh** | `src/server/courses.ts` live: list/get catalog with `track` + `category` filters, course detail with sections + lessons, mentor/admin create + publish. |
 | **Ayush** | `src/server/enrollments.ts` + `src/server/progress.ts` live: enrol (unique per student+course), my-enrolments, mark lesson complete → section rollup → calls `awardXp()`. |
-| **Yash** | `src/lib/xp.ts` + `src/server/xp.ts` live: `awardXp()` with idempotency, `summary()` (total, yearly, level, next-level), `ledger()`. Then `src/lib/anthropic.ts` and the first real `messages.parse` call returning a valid `AiReview`. |
+| **Yash** | `src/lib/xp.ts` + `src/server/xp.ts` live: `awardXp()` with idempotency, `summary()` (total, yearly, level, next-level), `ledger()`. Then `src/lib/ai.ts` and `npm run ai:smoke` to prove a real call returns a valid `AiReview`. |
 | **Riya** | `src/lib/ai-prompts.ts`: system prompt + rubric-aware review prompt + brief prompt. Then `components/ai/ReviewCard.tsx`, `StrengthsWeaknesses.tsx`, `PredictedScore.tsx` against the **mock** — no backend needed. |
 | **Makarand** | `src/server/gamification.ts` live: daily check-in (one per calendar day, writes `xp_event`), streak roll-forward, badge award check, challenge progress. |
 
