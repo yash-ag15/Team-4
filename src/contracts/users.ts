@@ -2,9 +2,7 @@ import { z } from 'zod'
 import { defineContract } from './_kit'
 import { mockUsers } from '@/mocks/factories'
 
-export const NGO_ROLES = ['volunteer', 'coordinator', 'donor', 'beneficiary', 'other'] as const
-export const NgoRole = z.enum(NGO_ROLES)
-export type NgoRole = z.infer<typeof NgoRole>
+export const SYSTEM_ROLES = ['student', 'mentor', 'admin'] as const
 
 /** The public profile shape. Never include anything the client must not see. */
 export const User = z.object({
@@ -12,11 +10,11 @@ export const User = z.object({
   name: z.string(),
   email: z.string(),
   image: z.string().nullable(),
-  ngoRole: NgoRole,
-  organization: z.string(),
+  systemRole: z.enum(SYSTEM_ROLES),
+  cohortYear: z.string(),
+  campus: z.string(),
   phone: z.string(),
   city: z.string(),
-  systemRole: z.enum(['user', 'admin']),
   onboardingComplete: z.boolean(),
   createdAt: z.string(), // ISO string
 })
@@ -29,7 +27,7 @@ export const me = defineContract({
   summary: 'The signed-in user profile',
   input: z.object({}),
   output: z.object({ user: User }),
-  mock: () => ({ user: mockUsers[0] }),
+  mock: () => ({ user: mockUsers[0] as unknown as User }),
 })
 
 export const updateProfile = defineContract({
@@ -39,15 +37,15 @@ export const updateProfile = defineContract({
   summary: 'Update the signed-in user profile',
   input: z.object({
     name: z.string().min(1).max(80).optional(),
-    ngoRole: NgoRole.optional(),
-    organization: z.string().max(120).optional(),
+    cohortYear: z.string().optional(),
+    campus: z.string().max(120).optional(),
     phone: z.string().max(40).optional(),
     city: z.string().max(80).optional(),
   }),
   output: z.object({ user: User }),
   mock: (patch) => ({
     user: {
-      ...mockUsers[0],
+      ...mockUsers[0] as unknown as User,
       ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)),
     },
   }),
@@ -59,19 +57,21 @@ export const completeOnboarding = defineContract({
   auth: 'user',
   summary: 'Finish the onboarding gate — sets onboardingComplete server-side',
   input: z.object({
-    ngoRole: NgoRole,
-    organization: z.string().max(120).optional(),
+    cohortYear: z.string(),
+    campus: z.string().max(120).optional(),
     phone: z.string().max(40).optional(),
     city: z.string().max(80).optional(),
+    mentorCode: z.string().optional(),
   }),
   output: z.object({ user: User }),
-  mock: ({ ngoRole, organization, phone, city }) => ({
+  mock: ({ cohortYear, campus, phone, city, mentorCode }) => ({
     user: {
-      ...mockUsers[0],
-      ngoRole,
-      organization: organization ?? mockUsers[0].organization,
-      phone: phone ?? mockUsers[0].phone,
-      city: city ?? mockUsers[0].city,
+      ...mockUsers[0] as unknown as User,
+      cohortYear,
+      campus: campus ?? '',
+      phone: phone ?? '',
+      city: city ?? '',
+      systemRole: (mentorCode ? 'mentor' : 'student') as 'student' | 'mentor' | 'admin',
       onboardingComplete: true,
     },
   }),

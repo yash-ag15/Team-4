@@ -43,11 +43,11 @@ const toPublicUser = (row: typeof user.$inferSelect): PublicUser => ({
   name: row.name,
   email: row.email,
   image: row.image ?? null,
-  ngoRole: row.ngoRole ?? 'volunteer',
-  organization: row.organization ?? '',
+  systemRole: (row.systemRole as PublicUser['systemRole']) ?? 'student',
+  cohortYear: row.cohortYear ?? '',
+  campus: row.campus ?? '',
   phone: row.phone ?? '',
   city: row.city ?? '',
-  systemRole: row.systemRole ?? 'user',
   onboardingComplete: row.onboardingComplete ?? false,
   createdAt: row.createdAt.toISOString(),
 })
@@ -63,7 +63,7 @@ export async function getMe(userId: string): Promise<{ user: PublicUser }> {
 }
 
 /**
- * `input` is already narrowed by the contract to name/ngoRole/organization/phone/city.
+ * `input` is already narrowed by the contract to name/cohortYear/campus/phone/city.
  * Never widen it — `systemRole` and `onboardingComplete` must not be settable from a
  * request body. That is the same privilege-escalation hole that `input: false` closes on
  * the Better Auth sign-up route.
@@ -92,10 +92,18 @@ export async function completeOnboarding(
   userId: string,
   input: CompleteOnboardingInput,
 ): Promise<{ user: PublicUser }> {
+  const { mentorCode, ...profileFields } = input
+
+  let systemRole: 'student' | 'mentor' | 'admin' = 'student'
+  if (mentorCode && process.env.MENTOR_SIGNUP_CODE && mentorCode === process.env.MENTOR_SIGNUP_CODE) {
+    systemRole = 'mentor'
+  }
+
   const [row] = await db
     .update(user)
     .set({
-      ...definedOnly(input), // ngoRole / organization / phone / city only
+      ...definedOnly(profileFields),
+      systemRole,
       onboardingComplete: true, // ← server-owned, never from `input`
       updatedAt: new Date(),
     })

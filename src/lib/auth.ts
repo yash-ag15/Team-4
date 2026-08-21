@@ -10,8 +10,8 @@ import { sendEmail } from '@/lib/email'
  * Self-declared profile role. This is NOT authorization — see `systemRole` below.
  * Adding a role here is a one-line change, then re-run `npx auth@latest generate`.
  */
-export const NGO_ROLES = ['volunteer', 'coordinator', 'donor', 'beneficiary', 'other'] as const
-export type NgoRole = (typeof NGO_ROLES)[number]
+export const SYSTEM_ROLES = ['student', 'mentor', 'admin'] as const
+export type SystemRole = (typeof SYSTEM_ROLES)[number]
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL, // required, or Google → redirect_uri_mismatch
@@ -34,20 +34,16 @@ export const auth = betterAuth({
 
   user: {
     additionalFields: {
-      // --- authorization: server-owned ---
-      // `input: false` is load-bearing. Anything `input: true` can be set by anyone
-      // POSTing to /api/auth/sign-up/email — i.e. curl would get you admin.
-      systemRole: { type: ['user', 'admin'], required: false, defaultValue: 'user', input: false },
+      // authorization — server-owned. input:false is load-bearing (see AGENTS.md rule 6).
+      systemRole: { type: [...SYSTEM_ROLES], required: false, defaultValue: 'student', input: false },
 
-      // --- NGO profile: self-declared, all optional so Google sign-up works ---
-      // Google returns email, name and picture. Nothing else. A single `required: true`
-      // custom field breaks Google sign-up entirely.
-      ngoRole: { type: [...NGO_ROLES], required: false, defaultValue: 'volunteer' },
-      organization: { type: 'string', required: false, defaultValue: '' },
+      // Katalyst profile — all optional, or Google sign-up breaks (AGENTS.md rule 5)
+      cohortYear: { type: 'string', required: false, defaultValue: '' },
+      campus: { type: 'string', required: false, defaultValue: '' },
       phone: { type: 'string', required: false, defaultValue: '' },
       city: { type: 'string', required: false, defaultValue: '' },
 
-      // --- the onboarding gate: server-owned so it can't be faked ---
+      // the onboarding gate — server-owned so it cannot be faked
       onboardingComplete: { type: 'boolean', required: false, defaultValue: false, input: false },
     },
   },

@@ -20,4 +20,14 @@ export function middleware(req: NextRequest) {
   return NextResponse.next()
 }
 
-export const config = { matcher: ['/dashboard/:path*', '/onboarding'] }
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/catalog/:path*',
+    '/learn/:path*',
+    '/leaderboard/:path*',
+    '/mentor/:path*',
+    '/admin/:path*',
+    '/onboarding',
+  ],
+}
