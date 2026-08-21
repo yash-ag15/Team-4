@@ -13,10 +13,12 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
     "auth:generate": "npx auth@latest generate",
-    "db:encrypt-emails": "tsx src/db/encrypt-emails.ts"
+    "db:encrypt-emails": "tsx src/db/encrypt-emails.ts",
+    "ai:smoke": "tsx src/scripts/ai-coach-smoke.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.7.1",
+    "@google/genai": "^2.18.0",
     "@hookform/resolvers": "^5.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "better-auth": "^1.7.1",

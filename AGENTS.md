@@ -331,7 +331,7 @@ They live in `src/lib/xp.ts`. Import them; never retype a magic number in a comp
 | Section complete | `section.xpAward` (default 50) | `section:<enrollmentId>:<sectionId>` |
 | Course complete | `course.xpBonusOnComplete` (default 100) | `course:<enrollmentId>` |
 | Certificate course complete | `+200` | `certificate:<enrollmentId>` |
-| Assessment — mentor award | mentor's `finalXp`, capped at `assessment.xpAward` | `submission:<submissionId>` |
+| Assessment — mentor award | mentor's `finalXp`, capped at **`applyTrack(assessment.xpAward, course.track)`** | `submission:<submissionId>` |
 | Daily check-in | `10` | `checkin:<userId>:<YYYY-MM-DD>` |
 | 7-day streak milestone | `50` | `streak:<userId>:<milestone>` |
 | Challenge complete | `challenge.xpReward` | `challenge:<challengeId>:<userId>` |
@@ -339,6 +339,13 @@ They live in `src/lib/xp.ts`. Import them; never retype a magic number in a comp
 
 **Optional-track multiplier:** every course-derived award above is multiplied by `1.5` and
 rounded when `course.track === 'optional'`. Check-in, streak and badge XP are not.
+
+> **The multiplier moves the CEILING too, not just the award.** An optional assessment
+> authored at 150 XP has an effective ceiling of 225. If the ceiling stayed at the raw
+> `xpAward`, a perfect score would suggest 225, the mentor would accept it, and
+> `decide()` would silently award 150 — two different numbers on screen for one action.
+> `AiReview.xpAward` on the wire is already track-adjusted; **`mentor.decide()` must clamp
+> to that same number.** (Riya — this is the one thing to check in `decide()`.)
 
 **Levels:** `level = floor(sqrt(totalXp / 100)) + 1` — thresholds 0 · 100 · 400 · 900 ·
 1600 · 2500 · 3600. Use `levelFromXp()` and `xpToNextLevel()` from `src/lib/xp.ts`.
@@ -350,39 +357,47 @@ rounded when `course.track === 'optional'`. Check-in, streak and badge XP are no
 Everything lives in `src/server/ai-coach.ts` + `src/lib/ai-prompts.ts`. Owner: **Yash**
 (pipeline), **Riya** (prompts and rubric).
 
+**Provider: Google Gemini, free tier.** We are not on Anthropic — its API is
+pay-as-you-go with no free tier and we had no credits. Get a free key at
+<https://aistudio.google.com/apikey> and put it in `.env.local` as `GEMINI_API_KEY`.
+
+**Nobody outside `src/lib/ai.ts` imports an LLM SDK.** That file exposes one function and
+everything else calls it, so the provider swap touched one file and zero contracts:
+
 ```ts
-// src/lib/anthropic.ts
-import Anthropic from '@anthropic-ai/sdk'
-export const anthropic = new Anthropic() // reads ANTHROPIC_API_KEY
-export const AI_MODEL = 'claude-opus-5'
+// src/lib/ai.ts — the only place @google/genai is imported
+export async function generateJson<T extends z.ZodTypeAny>(opts: {
+  system: string
+  prompt: string
+  schema: T          // a zod schema from the contract
+}): Promise<{ data: z.infer<T>; model: string; latencyMs: number; tokensIn: number; tokensOut: number }>
 ```
 
-The review call — structured output, no streaming, so a route handler returns one JSON:
+The review call is then provider-agnostic:
 
 ```ts
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-
-const res = await anthropic.messages.parse({
-  model: AI_MODEL,
-  max_tokens: 16000,
-  system: COACH_SYSTEM_PROMPT,          // src/lib/ai-prompts.ts
-  messages: [{ role: 'user', content: buildReviewPrompt({ assessment, submission, history }) }],
-  output_config: {
-    format: zodOutputFormat(AiReviewPayload),  // the SAME zod object the contract exports
-    effort: 'medium',                          // bump to 'high' if review quality is thin
-  },
+const res = await generateJson({
+  system: COACH_SYSTEM_PROMPT,                   // src/lib/ai-prompts.ts
+  prompt: buildReviewPrompt({ course, assessment, content, history, isPreview }),
+  schema: AiReviewPayload,                       // the SAME zod object the contract exports
 })
-const review = res.parsed_output      // null if parsing failed — guard, don't assert
+const review = res.data                          // already validated
 ```
 
 Rules:
 
-- `export const maxDuration = 60` on every `api/ai-coach/*` route. Reviews take ~10-25 s.
-- **No `budget_tokens`.** It is a 400 on `claude-opus-5`. Thinking is adaptive by default.
-- **No assistant prefill.** It is a 400 on `claude-opus-5`.
-- Check `res.stop_reason === 'refusal'` before reading content.
-- The zod schema in the contract IS the schema passed to `zodOutputFormat`. One definition.
-- No `ANTHROPIC_API_KEY` -> return `contract.mock(input)` and log a warning. Never throw.
+- `export const maxDuration = 60` on every `api/ai-coach/*` route. Reviews take ~5-20 s.
+- The zod schema in the contract does double duty: it constrains generation (via Gemini's
+  `responseJsonSchema`) **and** validates the response on the way back. Structured output
+  reduces malformed responses; it does not eliminate them, so the `safeParse` inside
+  `generateJson` is the actual guarantee. Never return unvalidated model output.
+- No `GEMINI_API_KEY` -> return `contract.mock(input)` and log a warning. Never throw.
+- **Free tier is rate-limited per minute AND per day.** A 429 degrades to a friendly
+  "the coach is busy" and the submission is still saved. If we exhaust the daily quota
+  mid-build, unset the key and everything falls back to mocks.
+- `GEMINI_MODEL` in `.env.local` overrides the model without touching code. See what your
+  key can reach with `npm run ai:smoke -- --list`.
+- Verify the pipeline any time with `npm run ai:smoke` — it hits no database.
 - **The returned `suggestedScore` / `suggestedXp` are advice.** They are stored on
   `ai_reviews` and denormalised onto `submissions.aiScore` / `aiXpSuggested` for list views.
   They never touch `xp_events`.

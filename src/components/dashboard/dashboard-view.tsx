@@ -9,7 +9,7 @@ import { ActivityHeatmap } from './activity-heatmap';
 import { StudyPlanCard } from './study-plan-card';
 import { AchievementsCard } from './achievements-card';
 import { MobileNav } from './mobile-nav';
-import { AiCoachPanel } from './ai-coach-panel';
+import { AiCoachPanel, type CoachPanelBrief } from './ai-coach-panel';
 import {
   initialUser,
   initialProgress,
@@ -40,6 +40,8 @@ interface DashboardViewProps {
   initialRankData?: LeaderboardRankInfo;
   initialMentorData?: MentorInfo;
   initialHeatmapData?: HeatmapCell[];
+  /** Live coach brief, read server-side. Optional — the panel falls back to its own copy. */
+  coachBrief?: CoachPanelBrief;
 }
 
 export function DashboardView({
@@ -51,6 +53,7 @@ export function DashboardView({
   initialRankData = initialRank,
   initialMentorData = initialMentor,
   initialHeatmapData,
+  coachBrief,
 }: DashboardViewProps) {
   const [user, setUser] = useState<UserProfile>(initialUserData);
   const [progress] = useState<ProgressSummary>(initialProgressData);
@@ -112,7 +115,7 @@ export function DashboardView({
       <MobileNav />
 
       {/* Interactive AI Coach Assistant */}
-      <AiCoachPanel userName={user.name} />
+      <AiCoachPanel userName={user.name} brief={coachBrief} />
     </div>
   );
 }
