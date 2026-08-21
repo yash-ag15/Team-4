@@ -498,13 +498,25 @@ export const listEvaluations = defineContract({
 // 5. Course Section / Module Management
 // ============================================================================
 
+export const ModuleType = z.enum([
+  'training_session',
+  'online_course',
+  'mentoring_task',
+  'project',
+  'assignment',
+  'milestone',
+])
+export type ModuleType = z.infer<typeof ModuleType>
+
 export const AdminModule = z.object({
   id: z.string(),
   courseId: z.string(),
   title: z.string(),
   description: z.string(),
+  type: ModuleType.default('online_course').optional(),
   order: z.number().int(),
   createdAt: z.string(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 })
 export type AdminModule = z.infer<typeof AdminModule>
 
@@ -517,7 +529,9 @@ export const createModule = defineContract({
     id: z.string(),
     title: z.string().min(1).max(200),
     description: z.string().default(''),
+    type: ModuleType.optional(),
     order: z.number().int().min(0).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
   }),
   output: z.object({
     module: AdminModule,
@@ -528,8 +542,10 @@ export const createModule = defineContract({
       courseId: input.id,
       title: input.title,
       description: input.description,
+      type: input.type ?? 'online_course',
       order: input.order ?? 0,
       createdAt: new Date().toISOString(),
+      meta: input.meta,
     },
   }),
 })

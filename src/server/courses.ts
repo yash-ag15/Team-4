@@ -5,7 +5,7 @@ import type { z } from 'zod'
 import { ApiError } from '@/contracts/_kit'
 import type * as coursesContract from '@/contracts/courses'
 import { db } from '@/db'
-import { courses, courseSections, lessons, user } from '@/db/schema'
+import { courses, courseSections, lessons, user, assessments } from '@/db/schema'
 import { applyTrack } from '@/lib/xp'
 
 export type Course = z.infer<typeof coursesContract.Course>
@@ -84,23 +84,60 @@ export async function createCourse(
   if (input.sections && input.sections.length > 0) {
     for (const [sIdx, s] of input.sections.entries()) {
       const sectionId = `sec-${randomUUID().slice(0, 8)}`
+      
+      let summaryText = s.summary ?? ''
+      if (s.type && s.type !== 'online_course') {
+        const metaObj = {
+          type: s.type,
+          summary: s.summary,
+          meta: s.meta ?? {},
+        }
+        summaryText = JSON.stringify(metaObj)
+      }
+
       await db.insert(courseSections).values({
         id: sectionId,
         courseId: inserted.id,
         title: s.title,
-        summary: s.summary ?? '',
+        summary: summaryText,
         orderIndex: s.orderIndex ?? sIdx,
         xpAward: s.xpAward ?? 50,
       })
       totalSections++
+
+      if (s.type === 'assignment' || s.type === 'project') {
+        const assessmentId = `asmt-${randomUUID().slice(0, 8)}`
+        const rubricText = s.meta?.rubric
+          ? typeof s.meta.rubric === 'string'
+            ? s.meta.rubric
+            : JSON.stringify(s.meta.rubric)
+          : 'Evaluation Rubric: Evidence (25%), Analysis (35%), Clarity (20%), Execution (20%)'
+
+        await db.insert(assessments).values({
+          id: assessmentId,
+          courseId: inserted.id,
+          sectionId,
+          title: s.title,
+          prompt: s.summary || s.title,
+          rubric: rubricText,
+          kind: s.type === 'project' ? 'project' : 'assignment',
+          maxScore: (s.meta?.maxScore as number) ?? 100,
+          xpAward: s.xpAward ?? 150,
+          orderIndex: sIdx,
+        })
+      }
+
       if (s.lessons && s.lessons.length > 0) {
         for (const [lIdx, l] of s.lessons.entries()) {
           const lessonId = `les-${randomUUID().slice(0, 8)}`
+          const validKind =
+            l.kind === 'video' || l.kind === 'reading' || l.kind === 'link' ? l.kind : 'reading'
+
           await db.insert(lessons).values({
             id: lessonId,
             sectionId,
             title: l.title,
-            kind: l.kind,
+            kind: validKind,
             contentUrl: l.contentUrl ?? '',
             contentBody: l.contentBody ?? '',
             durationMin: l.durationMin ?? 10,

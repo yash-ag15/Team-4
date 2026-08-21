@@ -23,7 +23,26 @@ export type CourseDifficulty = z.infer<typeof CourseDifficulty>
 export const CourseStatus = z.enum(['draft', 'published', 'archived'])
 export type CourseStatus = z.infer<typeof CourseStatus>
 
-export const LessonKind = z.enum(['video', 'reading', 'link'])
+export const ModuleType = z.enum([
+  'training_session',
+  'online_course',
+  'mentoring_task',
+  'project',
+  'assignment',
+  'milestone',
+])
+export type ModuleType = z.infer<typeof ModuleType>
+
+export const LessonKind = z.enum([
+  'video',
+  'reading',
+  'link',
+  'session',
+  'assignment',
+  'project',
+  'mentoring',
+  'milestone',
+])
 export type LessonKind = z.infer<typeof LessonKind>
 
 // ============================================================================
@@ -40,6 +59,7 @@ export const Lesson = z.object({
   durationMin: z.number().int().default(10),
   orderIndex: z.number().int().default(0),
   xpAward: z.number().int().default(10),
+  meta: z.record(z.string(), z.unknown()).optional(),
 })
 export type Lesson = z.infer<typeof Lesson>
 
@@ -48,8 +68,10 @@ export const Section = z.object({
   courseId: z.string().optional(),
   title: z.string(),
   summary: z.string().default(''),
+  type: ModuleType.default('online_course').optional(),
   orderIndex: z.number().int().default(0),
   xpAward: z.number().int().default(50),
+  meta: z.record(z.string(), z.unknown()).optional(),
   lessons: z.array(Lesson).default([]),
 })
 export type Section = z.infer<typeof Section>
@@ -306,8 +328,10 @@ export const create = defineContract({
         z.object({
           title: z.string().min(1),
           summary: z.string().default(''),
+          type: ModuleType.optional(),
           orderIndex: z.number().int().default(0),
           xpAward: z.number().int().default(50),
+          meta: z.record(z.string(), z.unknown()).optional(),
           lessons: z
             .array(
               z.object({
@@ -318,6 +342,7 @@ export const create = defineContract({
                 durationMin: z.number().int().default(15),
                 orderIndex: z.number().int().default(0),
                 xpAward: z.number().int().default(10),
+                meta: z.record(z.string(), z.unknown()).optional(),
               }),
             )
             .default([]),
