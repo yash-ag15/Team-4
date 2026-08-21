@@ -11,5 +11,7 @@
 // Tables: user, session, account, verification.
 export * from './auth'
 
-export * from './projects'
-export * from './tasks'
+export * from './courses'
+export * from './learning'
+export * from './engagement'
+export * from './social'
