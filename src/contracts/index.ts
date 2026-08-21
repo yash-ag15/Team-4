@@ -5,10 +5,7 @@ import * as courses from './courses'
 import * as sessions from './sessions'
 import * as users from './users'
 import * as userDashboard from './user-dashboard'
+import * as mentor from './mentor'
 
-// Union of both sides of the merge: origin/main's admin + courses + sessions, and this
-// branch's userDashboard. The starter's `projects`/`tasks` are deliberately NOT here —
-// their tables were dropped from src/db/schema, and HEAD listed them in this object
-// without importing them, so that side did not compile.
-export const contracts = { admin, courses, sessions, users, userDashboard }
+export const contracts = { admin, courses, sessions, users, userDashboard, mentor }
 export type Contracts = typeof contracts

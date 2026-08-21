@@ -160,6 +160,13 @@ export const getReport = defineContract({
   }),
 })
 
+// Compatibility alias for report
+export const ReportRow = AdminReportRow
+export type ReportRow = AdminReportRow
+export const ReportTotals = AdminReportTotals
+export type ReportTotals = AdminReportTotals
+export const report = getReport
+
 // ============================================================================
 // 2. User & Role Management
 // ============================================================================
@@ -170,8 +177,8 @@ export const AdminUserRow = z.object({
   email: z.string(),
   image: z.string().nullable(),
   systemRole: SystemRole,
-  cohortYear: z.string(),
-  campus: z.string(),
+  cohortYear: z.string().optional(),
+  campus: z.string().optional(),
   createdAt: z.string(),
 })
 export type AdminUserRow = z.infer<typeof AdminUserRow>
@@ -231,32 +238,42 @@ export const setRole = defineContract({
   auth: 'admin',
   summary: 'Change a user system role (e.g. promote to mentor)',
   input: z.object({
-    id: z.string(),
+    id: z.string().optional(),
+    userId: z.string().optional(),
     role: SystemRole,
   }),
   output: z.object({
-    user: AdminUserRow,
+    user: AdminUserRow.optional(),
+    success: z.boolean().optional(),
+    userId: z.string().optional(),
+    role: SystemRole.optional(),
   }),
-  mock: ({ id, role }) => ({
-    user: {
-      id,
-      name: 'Promoted User',
-      email: 'user@katalyst.test',
-      image: null,
-      systemRole: role,
-      cohortYear: '2026',
-      campus: 'Mumbai',
-      createdAt: '2026-01-10T00:00:00.000Z',
-    },
-  }),
+  mock: ({ id, userId, role }) => {
+    const targetId = id || userId || 'user-1'
+    return {
+      success: true,
+      userId: targetId,
+      role,
+      user: {
+        id: targetId,
+        name: 'Promoted User',
+        email: 'user@katalyst.test',
+        image: null,
+        systemRole: role,
+        cohortYear: '2026',
+        campus: 'Mumbai',
+        createdAt: '2026-01-10T00:00:00.000Z',
+      },
+    }
+  },
 })
 
 // ============================================================================
-// 3. Admin Student Roster & Performance
+// 3. Student Roster & Triage Management
 // ============================================================================
 
 export const AdminStudentRow = z.object({
-  userId: z.string(),
+  id: z.string(),
   name: z.string(),
   email: z.string(),
   image: z.string().nullable(),
@@ -266,10 +283,10 @@ export const AdminStudentRow = z.object({
   level: z.number().int(),
   coursesEnrolled: z.number().int(),
   coursesCompleted: z.number().int(),
-  avgProgressPct: z.number().int(),
+  avgProgressPct: z.number().int().min(0).max(100),
   lastActiveAt: z.string().nullable(),
-  pendingSubmissions: z.number().int(),
-  flags: z.array(StudentFlag),
+  flag: StudentFlag.nullable(),
+  flagReason: z.string().nullable(),
 })
 export type AdminStudentRow = z.infer<typeof AdminStudentRow>
 
@@ -277,7 +294,7 @@ export const listStudents = defineContract({
   method: 'GET',
   path: '/api/admin/students',
   auth: 'admin',
-  summary: 'List all students with aggregates and intervention flags',
+  summary: 'Admin overview of students with at-risk triage flags',
   input: z.object({
     cohortYear: z.string().optional(),
     campus: z.string().optional(),
@@ -291,36 +308,52 @@ export const listStudents = defineContract({
   mock: () => ({
     students: [
       {
-        userId: 'user-student-1',
+        id: 'user-st-1',
         name: 'Aarav Patel',
-        email: 'student1@katalyst.test',
+        email: 'aarav@example.com',
         image: null,
         cohortYear: '2026',
         campus: 'Mumbai',
-        totalXp: 850,
-        level: 3,
-        coursesEnrolled: 3,
-        coursesCompleted: 1,
-        avgProgressPct: 68,
-        lastActiveAt: '2026-08-20T14:30:00.000Z',
-        pendingSubmissions: 1,
-        flags: [],
-      },
-      {
-        userId: 'user-student-2',
-        name: 'Diya Sharma',
-        email: 'student2@katalyst.test',
-        image: null,
-        cohortYear: '2026',
-        campus: 'Bengaluru',
-        totalXp: 420,
+        totalXp: 350,
         level: 2,
         coursesEnrolled: 2,
         coursesCompleted: 0,
-        avgProgressPct: 20,
-        lastActiveAt: '2026-08-05T10:00:00.000Z',
-        pendingSubmissions: 0,
-        flags: ['inactive' as const, 'stalled' as const],
+        avgProgressPct: 65,
+        lastActiveAt: '2026-08-20T14:30:00.000Z',
+        flag: null,
+        flagReason: null,
+      },
+      {
+        id: 'user-st-2',
+        name: 'Diya Sharma',
+        email: 'diya@example.com',
+        image: null,
+        cohortYear: '2026',
+        campus: 'Bengaluru',
+        totalXp: 1200,
+        level: 4,
+        coursesEnrolled: 3,
+        coursesCompleted: 2,
+        avgProgressPct: 90,
+        lastActiveAt: '2026-08-19T11:20:00.000Z',
+        flag: null,
+        flagReason: null,
+      },
+      {
+        id: 'user-st-3',
+        name: 'Rohan Gupta',
+        email: 'rohan@example.com',
+        image: null,
+        cohortYear: '2025',
+        campus: 'Pune',
+        totalXp: 180,
+        level: 1,
+        coursesEnrolled: 1,
+        coursesCompleted: 0,
+        avgProgressPct: 15,
+        lastActiveAt: '2026-08-01T09:15:00.000Z',
+        flag: 'inactive' as const,
+        flagReason: 'No platform activity in over 14 days',
       },
     ],
   }),
@@ -330,20 +363,18 @@ export const studentPerformance = defineContract({
   method: 'GET',
   path: '/api/admin/students/:userId/performance',
   auth: 'admin',
-  summary: 'Detailed performance breakdown for a single student',
+  summary: 'Individual student performance summary and activity history',
   input: z.object({
     userId: z.string(),
   }),
   output: z.object({
     student: AdminStudentRow,
-    enrollments: z.array(
+    enrolledCourses: z.array(
       z.object({
         courseId: z.string(),
         courseTitle: z.string(),
         track: CourseTrack,
         progressPct: z.number().int(),
-        xpEarned: z.number().int(),
-        status: EnrollmentStatus,
         enrolledAt: z.string(),
         completedAt: z.string().nullable(),
       }),
@@ -351,107 +382,77 @@ export const studentPerformance = defineContract({
     submissions: z.array(
       z.object({
         id: z.string(),
-        assessmentTitle: z.string(),
-        courseTitle: z.string(),
+        taskTitle: z.string(),
         status: SubmissionStatus,
-        maxScore: z.number().int(),
-        score: z.number().int().nullable(),
-        xpAwarded: z.number().int().nullable(),
+        aiScore: z.number().int().nullable(),
+        mentorScore: z.number().int().nullable(),
+        finalXp: z.number().int().nullable(),
         submittedAt: z.string(),
-      }),
-    ),
-    evaluations: z.array(
-      z.object({
-        id: z.string(),
-        assessmentTitle: z.string(),
-        score: z.number().int(),
-        xpAwarded: z.number().int(),
-        feedback: z.string(),
-        evaluatedAt: z.string(),
       }),
     ),
   }),
   mock: ({ userId }) => ({
     student: {
-      userId,
+      id: userId,
       name: 'Aarav Patel',
-      email: 'student1@katalyst.test',
+      email: 'aarav@example.com',
       image: null,
       cohortYear: '2026',
       campus: 'Mumbai',
-      totalXp: 850,
-      level: 3,
+      totalXp: 350,
+      level: 2,
       coursesEnrolled: 2,
-      coursesCompleted: 1,
-      avgProgressPct: 75,
+      coursesCompleted: 0,
+      avgProgressPct: 65,
       lastActiveAt: '2026-08-20T14:30:00.000Z',
-      pendingSubmissions: 0,
-      flags: [],
+      flag: null,
+      flagReason: null,
     },
-    enrollments: [
+    enrolledCourses: [
       {
         courseId: 'course-1',
         courseTitle: 'Data Foundations & SQL Mastery',
         track: 'mandatory' as const,
-        progressPct: 100,
-        xpEarned: 500,
-        status: 'completed' as const,
+        progressPct: 75,
         enrolledAt: '2026-01-10T08:00:00.000Z',
-        completedAt: '2026-02-15T10:00:00.000Z',
-      },
-      {
-        courseId: 'course-2',
-        courseTitle: 'Advanced React Architecture',
-        track: 'optional' as const,
-        progressPct: 50,
-        xpEarned: 350,
-        status: 'active' as const,
-        enrolledAt: '2026-02-20T08:00:00.000Z',
         completedAt: null,
       },
     ],
     submissions: [
       {
         id: 'sub-1',
-        assessmentTitle: 'Design Database Schema for E-Commerce',
-        courseTitle: 'Data Foundations & SQL Mastery',
+        taskTitle: 'Explain ACID Properties with Practical Examples',
         status: 'mentor_approved' as const,
-        maxScore: 100,
-        score: 92,
-        xpAwarded: 150,
-        submittedAt: '2026-02-14T12:00:00.000Z',
-      },
-    ],
-    evaluations: [
-      {
-        id: 'eval-1',
-        assessmentTitle: 'Design Database Schema for E-Commerce',
-        score: 92,
-        xpAwarded: 150,
-        feedback: 'Excellent normalization and indexing strategy. Minor improvement on foreign keys.',
-        evaluatedAt: '2026-02-15T09:30:00.000Z',
+        aiScore: 88,
+        mentorScore: 90,
+        finalXp: 50,
+        submittedAt: '2026-01-15T12:00:00.000Z',
       },
     ],
   }),
 })
 
 // ============================================================================
-// 4. Admin Evaluations Monitoring
+// 4. Mentor Review & Evaluation Queue
 // ============================================================================
 
 export const AdminEvaluationRow = z.object({
-  submissionId: z.string(),
+  id: z.string(),
   studentId: z.string(),
   studentName: z.string(),
-  assessmentId: z.string(),
-  assessmentTitle: z.string(),
+  studentEmail: z.string(),
+  courseId: z.string(),
   courseTitle: z.string(),
-  score: z.number().int().nullable(),
-  xpAwarded: z.number().int().nullable(),
-  status: SubmissionStatus,
-  feedback: z.string().nullable(),
+  taskId: z.string(),
+  taskTitle: z.string(),
   submittedAt: z.string(),
-  evaluatedAt: z.string().nullable(),
+  status: SubmissionStatus,
+  aiScore: z.number().int().nullable(),
+  aiSuggestedXp: z.number().int().nullable(),
+  mentorScore: z.number().int().nullable(),
+  finalXp: z.number().int().nullable(),
+  mentorId: z.string().nullable(),
+  mentorName: z.string().nullable(),
 })
 export type AdminEvaluationRow = z.infer<typeof AdminEvaluationRow>
 
@@ -459,11 +460,11 @@ export const listEvaluations = defineContract({
   method: 'GET',
   path: '/api/admin/evaluations',
   auth: 'admin',
-  summary: 'Monitor AI and mentor evaluations across all submissions',
+  summary: 'Admin overview of submission review queue across all courses',
   input: z.object({
     status: SubmissionStatus.optional(),
     courseId: z.string().optional(),
-    studentId: z.string().optional(),
+    mentorId: z.string().optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
   output: z.object({
@@ -472,121 +473,95 @@ export const listEvaluations = defineContract({
   mock: () => ({
     evaluations: [
       {
-        submissionId: 'sub-101',
-        studentId: 'user-student-1',
+        id: 'sub-1',
+        studentId: 'user-st-1',
         studentName: 'Aarav Patel',
-        assessmentId: 'asm-1',
-        assessmentTitle: 'Full-Stack Architecture Plan',
-        courseTitle: 'Full-Stack Engineering',
-        score: 95,
-        xpAwarded: 150,
-        status: 'mentor_approved' as const,
-        feedback: 'Outstanding system design, clean separation of concerns.',
-        submittedAt: '2026-08-18T10:00:00.000Z',
-        evaluatedAt: '2026-08-18T11:15:00.000Z',
-      },
-      {
-        submissionId: 'sub-102',
-        studentId: 'user-student-2',
-        studentName: 'Diya Sharma',
-        assessmentId: 'asm-2',
-        assessmentTitle: 'Async JavaScript & Event Loop',
-        courseTitle: 'Frontend Engineering with Next.js',
-        score: 82,
-        xpAwarded: 120,
+        studentEmail: 'aarav@example.com',
+        courseId: 'course-1',
+        courseTitle: 'Data Foundations & SQL Mastery',
+        taskId: 'task-1',
+        taskTitle: 'Explain ACID Properties with Practical Examples',
+        submittedAt: '2026-08-20T10:00:00.000Z',
         status: 'ai_reviewed' as const,
-        feedback: 'Good grasp of microtasks. Please expand on web workers.',
-        submittedAt: '2026-08-19T14:20:00.000Z',
-        evaluatedAt: '2026-08-19T14:21:00.000Z',
+        aiScore: 85,
+        aiSuggestedXp: 50,
+        mentorScore: null,
+        finalXp: null,
+        mentorId: 'user-mentor-1',
+        mentorName: 'Siddesh Mentor',
       },
     ],
   }),
 })
 
 // ============================================================================
-// 5. Module & Task Management (Course / Task Authoring)
+// 5. Course Section / Module Management
 // ============================================================================
 
 export const AdminModule = z.object({
   id: z.string(),
+  courseId: z.string(),
   title: z.string(),
   description: z.string(),
-  difficulty: CourseDifficulty,
-  durationMin: z.number().int(),
-  category: z.string(),
-  track: CourseTrack,
-  status: CourseStatus,
+  order: z.number().int(),
   createdAt: z.string(),
 })
 export type AdminModule = z.infer<typeof AdminModule>
 
 export const createModule = defineContract({
   method: 'POST',
-  path: '/api/admin/modules',
+  path: '/api/admin/courses/:id/modules',
   auth: 'admin',
-  summary: 'Admin creates a new learning module/course',
+  summary: 'Admin creates a module (section) inside a course',
   input: z.object({
-    title: z.string().min(3).max(120),
-    description: z.string().max(2000).default(''),
-    difficulty: CourseDifficulty.default('beginner'),
-    durationMin: z.number().int().min(1).default(60),
-    category: z.string().default('technical'),
-    track: CourseTrack.default('mandatory'),
+    id: z.string(),
+    title: z.string().min(1).max(200),
+    description: z.string().default(''),
+    order: z.number().int().min(0).optional(),
   }),
   output: z.object({
     module: AdminModule,
   }),
   mock: (input) => ({
     module: {
-      id: 'module-new',
+      id: `mod-${Date.now()}`,
+      courseId: input.id,
       title: input.title,
       description: input.description,
-      difficulty: input.difficulty,
-      durationMin: input.durationMin,
-      category: input.category,
-      track: input.track,
-      status: 'draft' as const,
-      createdAt: '2026-08-21T10:00:00.000Z',
+      order: input.order ?? 0,
+      createdAt: new Date().toISOString(),
     },
   }),
 })
 
 export const listModules = defineContract({
   method: 'GET',
-  path: '/api/admin/modules',
+  path: '/api/admin/courses/:id/modules',
   auth: 'admin',
-  summary: 'Admin lists all modules',
+  summary: 'Admin lists all modules for a course ordered by index',
   input: z.object({
-    status: CourseStatus.optional(),
-    track: CourseTrack.optional(),
-    limit: z.coerce.number().int().min(1).max(100).optional(),
+    id: z.string(),
   }),
   output: z.object({
     modules: z.array(AdminModule),
   }),
-  mock: () => ({
+  mock: ({ id }) => ({
     modules: [
       {
-        id: 'module-1',
-        title: 'Data Structures & Algorithms',
-        description: 'Core concepts in trees, graphs, and dynamic programming.',
-        difficulty: 'intermediate' as const,
-        durationMin: 180,
-        category: 'technical',
-        track: 'mandatory' as const,
-        status: 'published' as const,
+        id: 'mod-1',
+        courseId: id,
+        title: 'Module 1: Relational Data Fundamentals',
+        description: 'Introduction to tables, relations and primary keys.',
+        order: 0,
         createdAt: '2026-01-10T00:00:00.000Z',
       },
       {
-        id: 'module-2',
-        title: 'Professional Communication',
-        description: 'Email etiquette, presentations, and stakeholder management.',
-        difficulty: 'beginner' as const,
-        durationMin: 120,
-        category: 'communication',
-        track: 'optional' as const,
-        status: 'published' as const,
-        createdAt: '2026-01-15T00:00:00.000Z',
+        id: 'mod-2',
+        courseId: id,
+        title: 'Module 2: Advanced Queries & Subqueries',
+        description: 'Deep dive into JOINs, aggregations and grouping.',
+        order: 1,
+        createdAt: '2026-01-10T00:00:00.000Z',
       },
     ],
   }),
@@ -596,7 +571,7 @@ export const getModule = defineContract({
   method: 'GET',
   path: '/api/admin/modules/:id',
   auth: 'admin',
-  summary: 'Admin fetches single module details',
+  summary: 'Admin gets details of a single module',
   input: z.object({
     id: z.string(),
   }),
@@ -606,13 +581,10 @@ export const getModule = defineContract({
   mock: ({ id }) => ({
     module: {
       id,
-      title: 'Data Structures & Algorithms',
-      description: 'Core concepts in trees, graphs, and dynamic programming.',
-      difficulty: 'intermediate' as const,
-      durationMin: 180,
-      category: 'technical',
-      track: 'mandatory' as const,
-      status: 'published' as const,
+      courseId: 'course-1',
+      title: 'Module 1: Relational Data Fundamentals',
+      description: 'Introduction to tables, relations and primary keys.',
+      order: 0,
       createdAt: '2026-01-10T00:00:00.000Z',
     },
   }),
@@ -622,16 +594,12 @@ export const updateModule = defineContract({
   method: 'PUT',
   path: '/api/admin/modules/:id',
   auth: 'admin',
-  summary: 'Admin updates a module',
+  summary: 'Admin updates a module title, description, or order',
   input: z.object({
     id: z.string(),
-    title: z.string().min(3).max(120).optional(),
-    description: z.string().max(2000).optional(),
-    difficulty: CourseDifficulty.optional(),
-    durationMin: z.number().int().min(1).optional(),
-    category: z.string().optional(),
-    track: CourseTrack.optional(),
-    status: CourseStatus.optional(),
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().optional(),
+    order: z.number().int().min(0).optional(),
   }),
   output: z.object({
     module: AdminModule,
@@ -639,27 +607,27 @@ export const updateModule = defineContract({
   mock: (input) => ({
     module: {
       id: input.id,
+      courseId: 'course-1',
       title: input.title ?? 'Updated Module',
       description: input.description ?? '',
-      difficulty: input.difficulty ?? ('intermediate' as const),
-      durationMin: input.durationMin ?? 120,
-      category: input.category ?? 'technical',
-      track: input.track ?? ('mandatory' as const),
-      status: input.status ?? ('published' as const),
+      order: input.order ?? 0,
       createdAt: '2026-01-10T00:00:00.000Z',
     },
   }),
 })
+
+// ============================================================================
+// 6. Task & Assessment Management
+// ============================================================================
 
 export const AdminTask = z.object({
   id: z.string(),
   moduleId: z.string(),
   title: z.string(),
   description: z.string(),
-  xp: z.number().int().min(0),
-  maxMarks: z.number().int().min(1),
+  xp: z.number().int(),
+  maxMarks: z.number().int(),
   evaluationCriteria: z.array(EvaluationCriterion),
-  taskData: z.record(z.string(), z.unknown()).optional(),
   status: TaskStatus,
   createdAt: z.string(),
 })
@@ -669,31 +637,30 @@ export const createTask = defineContract({
   method: 'POST',
   path: '/api/admin/modules/:id/tasks',
   auth: 'admin',
-  summary: 'Admin creates a task with evaluation criteria and XP',
+  summary: 'Admin creates an assessment task with rubric criteria',
   input: z.object({
     id: z.string(),
-    title: z.string().min(3).max(150),
-    description: z.string().min(5),
-    xp: z.number().int().min(1).max(500).default(50),
+    title: z.string().min(3).max(200),
+    description: z.string().min(10),
+    xp: z.number().int().min(1).max(1000).default(50),
     maxMarks: z.number().int().min(1).max(1000).default(100),
-    evaluationCriteria: z.array(EvaluationCriterion).min(1),
-    taskData: z.record(z.string(), z.unknown()).optional(),
+    evaluationCriteria: z.array(EvaluationCriterion).default([]),
+    status: TaskStatus.default('active'),
   }),
   output: z.object({
     task: AdminTask,
   }),
   mock: (input) => ({
     task: {
-      id: 'task-new',
+      id: `task-${Date.now()}`,
       moduleId: input.id,
       title: input.title,
       description: input.description,
       xp: input.xp,
       maxMarks: input.maxMarks,
       evaluationCriteria: input.evaluationCriteria,
-      taskData: input.taskData,
-      status: 'active' as const,
-      createdAt: '2026-08-21T10:30:00.000Z',
+      status: input.status,
+      createdAt: new Date().toISOString(),
     },
   }),
 })
@@ -702,7 +669,7 @@ export const listTasks = defineContract({
   method: 'GET',
   path: '/api/admin/modules/:id/tasks',
   auth: 'admin',
-  summary: 'Admin lists all tasks for a module',
+  summary: 'Admin lists all tasks belonging to a module',
   input: z.object({
     id: z.string(),
   }),
@@ -714,18 +681,17 @@ export const listTasks = defineContract({
       {
         id: 'task-1',
         moduleId: id,
-        title: 'Explain ACID Properties with Practical Transactions',
-        description: 'Explain Atomicity, Consistency, Isolation, and Durability with code snippets.',
+        title: 'Explain ACID Properties with Practical Examples',
+        description: 'Provide an in-depth breakdown of Atomicity, Consistency, Isolation, and Durability.',
         xp: 50,
         maxMarks: 100,
         evaluationCriteria: [
-          { name: 'Understanding', description: 'Accurate explanation of 4 properties', weight: 40 },
-          { name: 'Examples', description: 'Realistic SQL transaction examples', weight: 30 },
-          { name: 'Clarity', description: 'Clear structured response', weight: 30 },
+          { name: 'Conceptual Clarity', description: 'Accurate definition of ACID', weight: 40 },
+          { name: 'Practical Examples', description: 'SQL transaction scenarios', weight: 40 },
+          { name: 'Formatting & Coherence', description: 'Structured markdown explanation', weight: 20 },
         ],
-        taskData: { topic: 'DBMS', difficulty: 'medium' },
         status: 'active' as const,
-        createdAt: '2026-01-12T00:00:00.000Z',
+        createdAt: '2026-01-10T00:00:00.000Z',
       },
     ],
   }),
@@ -735,7 +701,7 @@ export const getTask = defineContract({
   method: 'GET',
   path: '/api/admin/tasks/:taskId',
   auth: 'admin',
-  summary: 'Get full task details including evaluation criteria',
+  summary: 'Admin gets details of a specific task and its rubric',
   input: z.object({
     taskId: z.string(),
   }),
@@ -745,19 +711,18 @@ export const getTask = defineContract({
   mock: ({ taskId }) => ({
     task: {
       id: taskId,
-      moduleId: 'module-1',
-      title: 'Explain ACID Properties with Practical Transactions',
-      description: 'Explain Atomicity, Consistency, Isolation, and Durability with code snippets.',
+      moduleId: 'mod-1',
+      title: 'Explain ACID Properties with Practical Examples',
+      description: 'Provide an in-depth breakdown of ACID properties.',
       xp: 50,
       maxMarks: 100,
       evaluationCriteria: [
-        { name: 'Understanding', description: 'Accurate explanation of 4 properties', weight: 40 },
-        { name: 'Examples', description: 'Realistic SQL transaction examples', weight: 30 },
-        { name: 'Clarity', description: 'Clear structured response', weight: 30 },
+        { name: 'Conceptual Clarity', description: 'Accurate definition of ACID', weight: 40 },
+        { name: 'Practical Examples', description: 'SQL transaction scenarios', weight: 40 },
+        { name: 'Formatting & Coherence', description: 'Structured markdown explanation', weight: 20 },
       ],
-      taskData: { topic: 'DBMS', difficulty: 'medium' },
       status: 'active' as const,
-      createdAt: '2026-01-12T00:00:00.000Z',
+      createdAt: '2026-01-10T00:00:00.000Z',
     },
   }),
 })
@@ -766,15 +731,15 @@ export const updateTask = defineContract({
   method: 'PUT',
   path: '/api/admin/tasks/:taskId',
   auth: 'admin',
-  summary: 'Admin updates task configuration',
+  summary: 'Admin updates task details, XP, marks or rubric evaluation criteria',
   input: z.object({
     taskId: z.string(),
-    title: z.string().min(3).max(150).optional(),
-    description: z.string().min(5).optional(),
-    xp: z.number().int().min(1).max(500).optional(),
+    title: z.string().min(3).max(200).optional(),
+    description: z.string().min(10).optional(),
+    xp: z.number().int().min(1).max(1000).optional(),
     maxMarks: z.number().int().min(1).max(1000).optional(),
     evaluationCriteria: z.array(EvaluationCriterion).optional(),
-    taskData: z.record(z.string(), z.unknown()).optional(),
+    status: TaskStatus.optional(),
   }),
   output: z.object({
     task: AdminTask,
@@ -782,17 +747,14 @@ export const updateTask = defineContract({
   mock: (input) => ({
     task: {
       id: input.taskId,
-      moduleId: 'module-1',
-      title: input.title ?? 'Updated Task',
+      moduleId: 'mod-1',
+      title: input.title ?? 'Updated Task Title',
       description: input.description ?? 'Updated description',
       xp: input.xp ?? 50,
       maxMarks: input.maxMarks ?? 100,
-      evaluationCriteria: input.evaluationCriteria ?? [
-        { name: 'Quality', description: 'Overall quality', weight: 100 },
-      ],
-      taskData: input.taskData,
-      status: 'active' as const,
-      createdAt: '2026-01-12T00:00:00.000Z',
+      evaluationCriteria: input.evaluationCriteria ?? [],
+      status: input.status ?? 'active',
+      createdAt: '2026-01-10T00:00:00.000Z',
     },
   }),
 })
@@ -801,7 +763,7 @@ export const setTaskStatus = defineContract({
   method: 'PATCH',
   path: '/api/admin/tasks/:taskId/status',
   auth: 'admin',
-  summary: 'Admin activates or deactivates a task without deleting historical records',
+  summary: 'Admin activates or deactivates a task without deleting student history',
   input: z.object({
     taskId: z.string(),
     status: TaskStatus,
@@ -812,43 +774,38 @@ export const setTaskStatus = defineContract({
   mock: ({ taskId, status }) => ({
     task: {
       id: taskId,
-      moduleId: 'module-1',
-      title: 'Explain ACID Properties with Practical Transactions',
-      description: 'Explain Atomicity, Consistency, Isolation, and Durability with code snippets.',
+      moduleId: 'mod-1',
+      title: 'Explain ACID Properties with Practical Examples',
+      description: 'Task description',
       xp: 50,
       maxMarks: 100,
-      evaluationCriteria: [
-        { name: 'Understanding', description: 'Accurate explanation of 4 properties', weight: 40 },
-        { name: 'Examples', description: 'Realistic SQL transaction examples', weight: 30 },
-        { name: 'Clarity', description: 'Clear structured response', weight: 30 },
-      ],
-      taskData: { topic: 'DBMS', difficulty: 'medium' },
+      evaluationCriteria: [],
       status,
-      createdAt: '2026-01-12T00:00:00.000Z',
+      createdAt: '2026-01-10T00:00:00.000Z',
     },
   }),
 })
 
 // ============================================================================
-// 7. Course Authoring & Management (Direct Table Integration)
+// 7. Course Management (Admin-Specific)
 // ============================================================================
 
 export const AdminCourse = z.object({
   id: z.string(),
   slug: z.string(),
   title: z.string(),
-  subtitle: z.string(),
-  description: z.string(),
-  coverEmoji: z.string(),
+  subtitle: z.string().default(''),
+  description: z.string().default(''),
+  coverEmoji: z.string().default('📘'),
   category: CourseCategory,
   track: CourseTrack,
   difficulty: CourseDifficulty,
-  certificateEligible: z.boolean(),
-  estimatedHours: z.number().int(),
-  xpBonusOnComplete: z.number().int(),
-  dueAt: z.string().nullable(),
+  certificateEligible: z.boolean().default(false),
+  estimatedHours: z.number().int().default(0),
+  xpBonusOnComplete: z.number().int().default(100),
+  dueAt: z.string().nullable().default(null),
   status: CourseStatus,
-  mentorId: z.string(),
+  mentorId: z.string().nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -858,15 +815,15 @@ export const createCourse = defineContract({
   method: 'POST',
   path: '/api/admin/courses',
   auth: 'admin',
-  summary: 'Admin creates a new course in the courses table',
+  summary: 'Admin creates a new course record',
   input: z.object({
     id: z.string().optional(),
-    slug: z.string().min(2).max(120),
+    slug: z.string().min(2).max(120).optional(),
     title: z.string().min(3).max(200),
     subtitle: z.string().default(''),
     description: z.string().default(''),
     coverEmoji: z.string().default('📘'),
-    category: CourseCategory,
+    category: CourseCategory.default('technical'),
     track: CourseTrack.default('mandatory'),
     difficulty: CourseDifficulty.default('beginner'),
     certificateEligible: z.boolean().default(false),
@@ -874,7 +831,7 @@ export const createCourse = defineContract({
     xpBonusOnComplete: z.number().int().min(0).default(100),
     dueAt: z.string().nullable().optional(),
     status: CourseStatus.default('draft'),
-    mentorId: z.string(),
+    mentorId: z.string().optional(),
   }),
   output: z.object({
     course: AdminCourse,
@@ -882,12 +839,12 @@ export const createCourse = defineContract({
   mock: (input) => ({
     course: {
       id: input.id ?? `course-${Date.now()}`,
-      slug: input.slug,
+      slug: input.slug ?? input.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       title: input.title,
       subtitle: input.subtitle ?? '',
       description: input.description ?? '',
       coverEmoji: input.coverEmoji ?? '📘',
-      category: input.category,
+      category: input.category ?? 'technical',
       track: input.track ?? 'mandatory',
       difficulty: input.difficulty ?? 'beginner',
       certificateEligible: input.certificateEligible ?? false,
@@ -895,7 +852,7 @@ export const createCourse = defineContract({
       xpBonusOnComplete: input.xpBonusOnComplete ?? 100,
       dueAt: input.dueAt ?? null,
       status: input.status ?? 'draft',
-      mentorId: input.mentorId,
+      mentorId: input.mentorId ?? 'user-1',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
@@ -906,11 +863,9 @@ export const listCourses = defineContract({
   method: 'GET',
   path: '/api/admin/courses',
   auth: 'admin',
-  summary: 'Admin lists all courses in the courses table',
+  summary: 'Admin lists all courses regardless of publication status',
   input: z.object({
     status: CourseStatus.optional(),
-    track: CourseTrack.optional(),
-    category: CourseCategory.optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
   output: z.object({
@@ -922,7 +877,7 @@ export const listCourses = defineContract({
         id: 'course-1',
         slug: 'data-foundations',
         title: 'Data Foundations & SQL Mastery',
-        subtitle: 'Learn relational data modeling and SQL',
+        subtitle: 'Learn relational data modeling and querying',
         description: 'Comprehensive SQL course from scratch to advanced queries.',
         coverEmoji: '📊',
         category: 'technical' as const,
@@ -1205,4 +1160,3 @@ export const reorderContent = defineContract({
     reorderedCount: input.items.length,
   }),
 })
-
