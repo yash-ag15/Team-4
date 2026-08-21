@@ -32,8 +32,8 @@ export default async function OnboardingPage() {
 
       <OnboardingForm
         defaults={{
-          ngoRole: session.user.ngoRole ?? 'volunteer',
-          organization: session.user.organization ?? '',
+          cohortYear: session.user.cohortYear ?? '',
+          campus: session.user.campus ?? '',
           phone: session.user.phone ?? '',
           city: session.user.city ?? '',
         }}

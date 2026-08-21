@@ -1,6 +1,6 @@
 # 04 — Assessments & submissions
 
-**Priority:** MUST · **Gate:** B · **Backend:** Ayush · **Frontend:** Samya
+**Priority:** MUST · **Gate:** B · **Backend:** Ayush · **Frontend:** Samya · **Branch:** `feature/submissions`
 **Contract:** `src/contracts/submissions.ts` (assessments read-ops live in
 `src/contracts/courses.ts` alongside sections and lessons)
 **Server:** `src/server/submissions.ts` · **Routes:** `src/app/api/submissions/*`

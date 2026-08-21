@@ -1,46 +1,129 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block');
 @import "tailwindcss";
 
 @theme {
-  --color-background: #fbf9f8;
-  --color-on-background: #1b1c1c;
-
-  --color-primary: #6b0030;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #950045;
-  --color-on-primary-container: #ff9db6;
-
-  --color-secondary: #686000;
-  --color-on-secondary: #ffffff;
-  --color-secondary-container: #f4e657;
-  --color-on-secondary-container: #6e6600;
-  --color-secondary-fixed: #f4e657;
-  --color-secondary-fixed-dim: #d7c93e;
-  --color-on-secondary-fixed: #1f1c00;
-  --color-on-secondary-fixed-variant: #4e4800;
-
-  --color-tertiary: #003c19;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #005627;
-
-  --color-surface: #fbf9f8;
-  --color-surface-bright: #fbf9f8;
-  --color-surface-dim: #dcd9d9;
-  --color-surface-variant: #e4e2e1;
-  --color-on-surface-variant: #584146;
+  --color-background: #f8f9ff;
+  --color-on-background: #0d1c2e;
+  --color-surface: #f8f9ff;
+  --color-surface-dim: #ccdbf3;
+  --color-surface-bright: #f8f9ff;
   --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #f6f3f2;
-  --color-surface-container: #f0eded;
-  --color-surface-container-high: #eae8e7;
-  --color-surface-container-highest: #e4e2e1;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e6eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d5e3fc;
+  --color-surface-variant: #d5e3fc;
+  --color-surface-tint: #565e74;
+  --color-on-surface: #0d1c2e;
+  --color-on-surface-variant: #45464d;
+  --color-outline: #76777d;
+  --color-outline-variant: #c6c6cd;
+  
+  --color-primary: #2596BE;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #d0ecf6;
+  --color-on-primary-container: #0a3d52;
+  --color-primary-fixed: #b8e0f0;
+  --color-primary-fixed-dim: #7cc8e0;
+  --color-on-primary-fixed: #0a3d52;
+  --color-on-primary-fixed-variant: #1a7a9e;
+  
+  --color-secondary: #1a7a9e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #2170e4;
+  --color-on-secondary-container: #fefcff;
+  --color-secondary-fixed: #d8e2ff;
+  --color-secondary-fixed-dim: #adc6ff;
+  --color-on-secondary-fixed: #001a42;
+  --color-on-secondary-fixed-variant: #004395;
+  
+  --color-tertiary: #E8DA4D;
+  --color-on-tertiary: #3a3400;
+  --color-tertiary-container: #fff3b0;
+  --color-on-tertiary-container: #5c5200;
+  --color-tertiary-fixed: #fff3b0;
+  --color-tertiary-fixed-dim: #e8da4d;
+  --color-on-tertiary-fixed: #3a3400;
+  --color-on-tertiary-fixed-variant: #5c5200;
+  
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  
+  --color-inverse-surface: #233144;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-inverse-primary: #7cc8e0;
+  
+  --color-xp-gold: #E8DA4D;
+  --color-streak-orange: #ff8c00;
+  
+  --spacing-container-max: 1280px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 40px;
+}
 
-  --color-outline: #8b7076;
-  --color-outline-variant: #dfbec4;
+/* ── Dark mode ────────────────────────────────────────────────────────────────
+   Tailwind v4 generates @theme values as CSS custom properties under :root.
+   Overriding them here under .dark makes every utility class (bg-background,
+   text-on-surface-variant, border-outline-variant, etc.) flip automatically —
+   no need for dark: prefix on individual elements.
+   Toggle by adding/removing class="dark" on <html>.
+───────────────────────────────────────────────────────────────────────────── */
+.dark {
+  --color-background: #0d1c2e;
+  --color-on-background: #e8f0fe;
 
-  --color-xp-gold: #e8da4d;
+  --color-surface: #0d1c2e;
+  --color-surface-dim: #0a1626;
+  --color-surface-bright: #1a2a40;
+  --color-surface-container-lowest: #070f1a;
+  --color-surface-container-low: #111e30;
+  --color-surface-container: #162438;
+  --color-surface-container-high: #1c2d44;
+  --color-surface-container-highest: #233650;
+  --color-surface-variant: #1c2d44;
+  --color-surface-tint: #8a94b0;
 
-  --font-headline-lg: 'Montserrat', sans-serif;
-  --font-body-md: 'Inter', sans-serif;
+  --color-on-surface: #e8f0fe;
+  --color-on-surface-variant: #9aa5bf;
+  --color-outline: #5a6680;
+  --color-outline-variant: #2a3a55;
+
+  --color-primary: #5cc8e8;
+  --color-on-primary: #003544;
+  --color-primary-container: #1a5a72;
+  --color-on-primary-container: #b8e0f0;
+  --color-primary-fixed: #1c2d44;
+  --color-primary-fixed-dim: #162438;
+  --color-on-primary-fixed: #b8e0f0;
+  --color-on-primary-fixed-variant: #7cc8e0;
+
+  /* Secondary — deeper teal in dark mode */
+  --color-secondary: #38b2d8;
+  --color-on-secondary: #001a42;
+  --color-secondary-container: #1a5a72;
+  --color-on-secondary-container: #b8e0f0;
+  --color-secondary-fixed: #1c2d44;
+  --color-secondary-fixed-dim: #162438;
+  --color-on-secondary-fixed: #d0e4f4;
+  --color-on-secondary-fixed-variant: #8ab8d0;
+
+  /* Tertiary — warm gold accent */
+  --color-tertiary: #e8da4d;
+  --color-on-tertiary: #3a3400;
+  --color-tertiary-container: #5c5200;
+  --color-on-tertiary-container: #fff3b0;
+
+  --color-error: #f2b8b8;
+  --color-on-error: #601410;
+  --color-error-container: #8c1d18;
+  --color-on-error-container: #f9dedc;
+
+  --color-inverse-surface: #e8f0fe;
+  --color-inverse-on-surface: #0d1c2e;
+  --color-inverse-primary: #1a7a9e;
 }
 
 body {
@@ -69,13 +152,4 @@ body {
 
 .material-symbols-outlined.fill-icon {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-}
-
-/* Scrollbar utilities */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }

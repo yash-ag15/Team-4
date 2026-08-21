@@ -7,6 +7,13 @@ import { mockUsers } from '@/mocks/factories'
 
 type Ctx = {
   user: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>['user'] | null
+  /**
+   * The session row behind `user`, when there is a real one. Null for a mock identity —
+   * a mock has no session in the database. Handlers that manage sessions (revoking other
+   * devices) need the current session's token to know which one to spare; everything
+   * else should keep using `user`.
+   */
+  session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>['session'] | null
   req: NextRequest
 }
 type Handler<I extends z.ZodTypeAny, O extends z.ZodTypeAny> = (
@@ -70,11 +77,13 @@ export function defineRoute<I extends z.ZodTypeAny, O extends z.ZodTypeAny>(
 
       // 4. Authorize.
       let user: Ctx['user'] = null
+      let sessionRow: Ctx['session'] = null
       if (contract.auth !== 'public') {
         const session = await auth.api.getSession({ headers: await headers() })
 
         if (session) {
           user = session.user
+          sessionRow = session.session
         } else if (willMock && process.env.NODE_ENV !== 'production') {
           // THE POINT OF THE MOCK LAYER: a teammate who has just cloned the repo has no
           // database, so they cannot sign up, so they would have no session — and every
@@ -114,7 +123,7 @@ export function defineRoute<I extends z.ZodTypeAny, O extends z.ZodTypeAny>(
       }
 
       // 6. Live.
-      const data = await handler(input, { user, req })
+      const data = await handler(input, { user, session: sessionRow, req })
 
       // 7. THE line that stops mock/real drift. (findings F5)
       if (process.env.NODE_ENV !== 'production') {

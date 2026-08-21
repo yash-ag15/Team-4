@@ -26,16 +26,20 @@ export default function SignInPage() {
       return
     }
 
-    // /onboarding is the single gate — it bounces straight to /dashboard for anyone
-    // who has already completed it.
-    router.push('/onboarding')
+    // router.refresh() BEFORE the push, not after: /post-auth is a server component that
+    // reads the session cookie, and pushing first can render it against the cached
+    // pre-sign-in tree — which sees no session and bounces straight back to /sign-in.
+    // That bounce is what made sign-in look like it "did nothing".
     router.refresh()
+    // /post-auth is the single funnel — it decides between the concurrent-session
+    // screen, /onboarding and /dashboard. Never hard-code a destination here.
+    router.push('/post-auth')
   }
 
   async function onGoogle() {
     setError(null)
     setPending(true)
-    await signIn.social({ provider: 'google', callbackURL: '/onboarding' })
+    await signIn.social({ provider: 'google', callbackURL: '/post-auth' })
   }
 
   return (

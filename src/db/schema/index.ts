@@ -10,5 +10,8 @@
 // `additionalFields` from `src/lib/auth.ts`). Never hand-edit it — re-run the CLI.
 // Tables: user, session, account, verification.
 export * from './auth'
-export * from './projects'
-export * from './tasks'
+
+export * from './courses'
+export * from './learning'
+export * from './engagement'
+export * from './social'
