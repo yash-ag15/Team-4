@@ -9,6 +9,13 @@ const STATUS_CONFIG: Record<
   SubmissionStatus,
   { label: string; bg: string; text: string; border: string; dot: string }
 > = {
+  draft: {
+    label: 'Draft',
+    bg: 'bg-gray-50/90',
+    text: 'text-gray-700',
+    border: 'border-gray-200',
+    dot: 'bg-gray-400',
+  },
   submitted: {
     label: 'Submitted',
     bg: 'bg-blue-50/90',

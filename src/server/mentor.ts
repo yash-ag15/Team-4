@@ -70,17 +70,15 @@ export async function assertOwnsCourse(user: SessionUser, courseId: string): Pro
 export async function queue(
   user: SessionUser,
   input: QueueInput,
-): Promise<{ reviews: mentorContract.MentorQueueItem[]; total: number }> {
+): Promise<{ submissions: mentorContract.QueueSubmission[]; total: number }> {
   assertMentor(user)
 
   const conditions = [
-    eq(submissions.status, input.status ?? 'ai_reviewed'),
+    input.status ? eq(submissions.status, input.status) : eq(submissions.status, 'ai_reviewed'),
     user.systemRole === 'admin' ? undefined : eq(courses.mentorId, user.id),
     input.courseId ? eq(courses.id, input.courseId) : undefined,
   ].filter((c) => c !== undefined)
 
-  // Total independent of `limit` — the frontend badge calls `queue({ limit: 1 })` purely to
-  // keep the payload small while still getting an accurate pending count.
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)` })
     .from(submissions)
@@ -90,16 +88,17 @@ export async function queue(
 
   const rows = await db
     .select({
-      submissionId: submissions.id,
+      id: submissions.id,
       submittedAt: submissions.submittedAt,
       status: submissions.status,
       aiScore: submissions.aiScore,
       aiXpSuggested: submissions.aiXpSuggested,
       studentId: submissions.studentId,
       studentName: userTable.name,
+      studentEmail: userTable.email,
+      studentAvatar: userTable.image,
       courseId: courses.id,
       courseTitle: courses.title,
-      track: courses.track,
       assessmentId: assessments.id,
       assessmentTitle: assessments.title,
       maxScore: assessments.maxScore,
@@ -114,7 +113,7 @@ export async function queue(
     .limit(input.limit ?? 100)
 
   return {
-    reviews: rows.map((r) => ({
+    submissions: rows.map((r) => ({
       ...r,
       submittedAt: r.submittedAt.toISOString(),
     })),
@@ -142,13 +141,21 @@ async function loadSubmissionContext(id: string) {
 export async function getForReview(
   user: SessionUser,
   id: string,
-): Promise<mentorContract.MentorReviewDetail> {
+): Promise<{
+  submission: mentorContract.SubmissionDetail
+  aiReview: mentorContract.AiReview | null
+  studentContext: mentorContract.StudentContext
+}> {
   assertMentor(user)
   const { submission, assessment, course } = await loadSubmissionContext(id)
   await assertOwnsCourse(user, course.id)
 
-  // The latest NON-PREVIEW review — a student who ran previews has several rows; only one
-  // (isPreview: false) is the real review the mentor should see.
+  const [studentUser] = await db
+    .select({ name: userTable.name, email: userTable.email, image: userTable.image })
+    .from(userTable)
+    .where(eq(userTable.id, submission.studentId))
+    .limit(1)
+
   const [review] = await db
     .select()
     .from(aiReviews)
@@ -177,66 +184,54 @@ export async function getForReview(
     .limit(2)
 
   const totalXpByUser = await getTotalXpForUsers([submission.studentId])
+  const totalXp = totalXpByUser[submission.studentId] ?? 0
 
   return {
     submission: {
       id: submission.id,
+      studentId: submission.studentId,
+      studentName: studentUser?.name ?? 'Unknown student',
+      studentEmail: studentUser?.email ?? '',
+      studentAvatar: studentUser?.image ?? null,
+      courseId: course.id,
+      courseTitle: course.title,
+      assessmentId: assessment.id,
+      assessmentTitle: assessment.title,
       content: submission.content,
-      attachmentUrl: submission.attachmentUrl,
+      submittedAt: submission.submittedAt.toISOString(),
       status: submission.status,
-      aiScore: submission.aiScore,
-      aiXpSuggested: submission.aiXpSuggested,
       finalScore: submission.finalScore,
       finalXp: submission.finalXp,
       mentorNote: submission.mentorNote,
-      submittedAt: submission.submittedAt.toISOString(),
-      reviewedAt: submission.reviewedAt ? submission.reviewedAt.toISOString() : null,
-    },
-    course: { id: course.id, title: course.title, track: course.track },
-    assessment: {
-      id: assessment.id,
-      title: assessment.title,
-      prompt: assessment.prompt,
-      rubric: assessment.rubric,
       maxScore: assessment.maxScore,
       xpAward: assessment.xpAward,
     },
     aiReview: review
       ? {
           id: review.id,
-          model: review.model,
-          summary: review.summary,
-          strengths: review.strengths,
-          weaknesses: review.weaknesses,
-          actionItems: review.actionItems,
-          rubricBreakdown: review.rubricBreakdown as mentorContract.RubricLine[],
-          suggestedScore: review.suggestedScore,
+          score: review.suggestedScore,
           suggestedXp: review.suggestedXp,
-          confidence: review.confidence,
-          latencyMs: review.latencyMs,
-          createdAt: review.createdAt.toISOString(),
+          confidence: review.confidence as any,
+          feedback: review.summary,
+          strengths: review.strengths ?? [],
+          weaknesses: review.weaknesses ?? [],
+          actionItems: review.actionItems ?? [],
+          rubricBreakdown: review.rubricBreakdown as any,
+          isPreview: review.isPreview,
+          reviewedAt: review.createdAt.toISOString(),
         }
       : null,
-    student: {
-      studentId: submission.studentId,
-      studentName: await studentNameOf(submission.studentId),
-      totalXp: totalXpByUser[submission.studentId] ?? 0,
-      courseProgressPct: enrollment?.progressPct ?? null,
+    studentContext: {
+      currentXp: totalXp,
+      level: levelFromXp(totalXp),
+      courseProgressPct: enrollment?.progressPct ?? 0,
       recentScores: recentScores.map((s) => ({
-        submissionId: s.submissionId,
         assessmentTitle: s.assessmentTitle,
         score: s.score ?? s.aiScore,
-        submittedAt: s.submittedAt.toISOString(),
+        maxScore: 100,
       })),
     },
   }
-}
-
-/** `getForReview` needs the student's name but doesn't otherwise select from `userTable` —
- *  a tiny lookup rather than joining a fourth table into the query above for one column. */
-async function studentNameOf(studentId: string): Promise<string> {
-  const [row] = await db.select({ name: userTable.name }).from(userTable).where(eq(userTable.id, studentId)).limit(1)
-  return row?.name ?? 'Unknown student'
 }
 
 // ---------------------------------------------------------------------------
@@ -264,8 +259,12 @@ export async function decide(
   const { submission, assessment, courseId } = await loadForDecision(input.id)
   await assertOwnsCourse(user, courseId)
 
-  const finalScore = clamp(input.finalScore, 0, assessment.maxScore)
-  const finalXp = clamp(input.finalXp, 0, assessment.xpAward)
+  const rawScore = input.score ?? input.finalScore ?? 0
+  const rawXp = input.finalXp ?? 0
+  const mentorNote = input.mentorNote ?? input.note ?? ''
+
+  const finalScore = clamp(rawScore, 0, assessment.maxScore)
+  const finalXp = clamp(rawXp, 0, assessment.xpAward)
   const status = input.decision === 'approve' ? ('mentor_approved' as const) : ('changes_requested' as const)
 
   await db
@@ -275,7 +274,7 @@ export async function decide(
       finalScore,
       finalXp: input.decision === 'approve' ? finalXp : null,
       mentorId: user.id,
-      mentorNote: input.note,
+      mentorNote,
       reviewedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -294,16 +293,13 @@ export async function decide(
       note: `${assessment.title} — ${finalScore}/${assessment.maxScore}`,
       idempotencyKey: `submission:${submission.id}`,
     })
-    // checkBadges(submission.studentId) belongs to feature 08 (gamification), which has not
-    // landed on this branch — no badges/user_badges logic exists to call. Intentionally
-    // skipped rather than faked; see the implementation report for this run.
   }
 
   return {
+    success: true,
     submissionId: submission.id,
-    decision: input.decision,
     status,
-    finalScore,
+    finalScore: input.decision === 'approve' ? finalScore : null,
     finalXp: input.decision === 'approve' ? finalXp : null,
     award: award
       ? {
@@ -481,7 +477,7 @@ export async function students(
       const totalXp = totalXpByUser[r.userId] ?? 0
 
       return {
-        userId: r.userId,
+        id: r.userId,
         name: r.name,
         email: r.email,
         image: r.image,
@@ -493,13 +489,12 @@ export async function students(
         coursesCompleted: Number(r.coursesCompleted),
         avgProgressPct: Math.round(Number(r.avgProgressPct)),
         lastActiveAt: lastActiveAt ? lastActiveAt.toISOString() : null,
-        pendingSubmissions: pendingByUser[r.userId] ?? 0,
-        flags,
+        flag: flags[0] ?? null,
+        flagReason: flags.length > 0 ? `Flagged: ${flags.join(', ')}` : null,
       }
     }).filter((s) => {
       if (!input.flag) return true
-      if (input.flag === 'at_risk') return s.flags.length > 0
-      return s.flags.includes(input.flag)
+      return s.flag === input.flag
     }),
   }
 }

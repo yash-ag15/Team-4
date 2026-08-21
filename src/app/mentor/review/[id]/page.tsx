@@ -115,8 +115,8 @@ export default function SubmissionReviewDetailPage({ params }: PageProps) {
 
       setDecisionResult({
         status: res.status,
-        awardedXp: res.awardedXp,
-        note: res.note,
+        awardedXp: res.awardedXp ?? res.finalXp ?? 0,
+        note: res.note ?? mentorNote,
       })
 
       setSubmission((prev) =>
@@ -384,7 +384,7 @@ export default function SubmissionReviewDetailPage({ params }: PageProps) {
                       <span>✓</span> Strengths ({aiReview.strengths.length})
                     </p>
                     <ul className="space-y-1 text-xs text-slate-600">
-                      {aiReview.strengths.map((st, i) => (
+                      {aiReview.strengths.map((st: string, i: number) => (
                         <li key={i} className="flex items-start gap-2 bg-emerald-50/50 p-2 rounded-lg border border-emerald-100/80">
                           <span className="text-emerald-500 shrink-0 font-bold">•</span>
                           <span>{st}</span>
@@ -401,7 +401,7 @@ export default function SubmissionReviewDetailPage({ params }: PageProps) {
                       <span>⚠</span> Areas to Improve ({aiReview.weaknesses.length})
                     </p>
                     <ul className="space-y-1 text-xs text-slate-600">
-                      {aiReview.weaknesses.map((wk, i) => (
+                      {aiReview.weaknesses.map((wk: string, i: number) => (
                         <li key={i} className="flex items-start gap-2 bg-rose-50/50 p-2 rounded-lg border border-rose-100/80">
                           <span className="text-rose-500 shrink-0 font-bold">•</span>
                           <span>{wk}</span>
@@ -416,7 +416,7 @@ export default function SubmissionReviewDetailPage({ params }: PageProps) {
                   <div className="pt-2 border-t border-slate-100 space-y-2">
                     <p className="text-xs font-mono uppercase font-bold text-slate-500">Rubric Breakdown</p>
                     <div className="space-y-1.5">
-                      {aiReview.rubricBreakdown.map((r, i) => (
+                      {aiReview.rubricBreakdown.map((r: any, i: number) => (
                         <div key={i} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100">
                           <div>
                             <p className="font-semibold text-slate-800">{r.criterion}</p>
