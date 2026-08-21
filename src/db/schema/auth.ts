@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -12,11 +19,11 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
-  systemRole: text("system_role", { enum: ["user", "admin"] }).default("user"),
-  ngoRole: text("ngo_role", {
-    enum: ["volunteer", "coordinator", "donor", "beneficiary", "other"],
-  }).default("volunteer"),
-  organization: text("organization").default(""),
+  systemRole: text("system_role", {
+    enum: ["student", "mentor", "admin"],
+  }).default("student"),
+  cohortYear: text("cohort_year").default(""),
+  campus: text("campus").default(""),
   phone: text("phone").default(""),
   city: text("city").default(""),
   onboardingComplete: boolean("onboarding_complete").default(false),
@@ -45,6 +52,7 @@ export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
+    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -62,7 +70,13 @@ export const account = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("account_userId_idx").on(table.userId)],
+  (table) => [
+    uniqueIndex("account_issuer_accountId_uidx").on(
+      table.issuer,
+      table.accountId,
+    ),
+    index("account_userId_idx").on(table.userId),
+  ],
 );
 
 export const verification = pgTable(

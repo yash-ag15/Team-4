@@ -14,6 +14,7 @@ CREATE TYPE "public"."submission_status" AS ENUM('draft', 'submitted', 'ai_revie
 CREATE TYPE "public"."notification_kind" AS ENUM('due_soon', 'overdue', 'xp_awarded', 'review_ready', 'challenge', 'nudge', 'escalation');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
+	"issuer" text NOT NULL,
 	"account_id" text NOT NULL,
 	"provider_id" text NOT NULL,
 	"user_id" text NOT NULL,
@@ -48,9 +49,9 @@ CREATE TABLE "user" (
 	"image" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
-	"system_role" text DEFAULT 'user',
-	"ngo_role" text DEFAULT 'volunteer',
-	"organization" text DEFAULT '',
+	"system_role" text DEFAULT 'student',
+	"cohort_year" text DEFAULT '',
+	"campus" text DEFAULT '',
 	"phone" text DEFAULT '',
 	"city" text DEFAULT '',
 	"onboarding_complete" boolean DEFAULT false,
@@ -316,6 +317,7 @@ ALTER TABLE "submissions" ADD CONSTRAINT "submissions_mentor_id_user_id_fk" FORE
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_members" ADD CONSTRAINT "team_members_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "team_members" ADD CONSTRAINT "team_members_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "account_issuer_accountId_uidx" ON "account" USING btree ("issuer","account_id");--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");

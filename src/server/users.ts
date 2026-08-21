@@ -5,6 +5,7 @@ import { ApiError } from '@/contracts/_kit'
 import type * as users from '@/contracts/users'
 import { db } from '@/db'
 import { user } from '@/db/schema'
+import { decryptEmailSafe } from '@/lib/crypto'
 
 /**
  * Business logic for the `users.*` contracts.
@@ -29,6 +30,10 @@ export type CompleteOnboardingInput = z.infer<(typeof users.completeOnboarding)[
  * Two mismatches to absorb, both real:
  *  1. `createdAt` is a Date in the row and MUST become an ISO string — the contract says
  *     `z.string()`, and a Date would not survive JSON intact.
+ *  1b. `email` is stored encrypted (see `@/lib/crypto`). These queries go through Drizzle
+ *     directly rather than the Better Auth adapter, so the adapter's decryption does not
+ *     apply and it has to happen here — otherwise every profile response would ship
+ *     `enc:v1:…` to the client.
  *  2. The `additionalFields` columns are generated as `.default(...)` but NOT `.notNull()`,
  *     so Drizzle types them nullable, while the contract's `User` requires non-null. Every
  *     one of them is coalesced here. Without this the route would return null for a fresh
@@ -41,13 +46,13 @@ export type CompleteOnboardingInput = z.infer<(typeof users.completeOnboarding)[
 const toPublicUser = (row: typeof user.$inferSelect): PublicUser => ({
   id: row.id,
   name: row.name,
-  email: row.email,
+  email: decryptEmailSafe(row.email),
   image: row.image ?? null,
-  ngoRole: row.ngoRole ?? 'volunteer',
-  organization: row.organization ?? '',
+  systemRole: (row.systemRole as PublicUser['systemRole']) ?? 'student',
+  cohortYear: row.cohortYear ?? '',
+  campus: row.campus ?? '',
   phone: row.phone ?? '',
   city: row.city ?? '',
-  systemRole: row.systemRole ?? 'user',
   onboardingComplete: row.onboardingComplete ?? false,
   createdAt: row.createdAt.toISOString(),
 })
@@ -63,7 +68,7 @@ export async function getMe(userId: string): Promise<{ user: PublicUser }> {
 }
 
 /**
- * `input` is already narrowed by the contract to name/ngoRole/organization/phone/city.
+ * `input` is already narrowed by the contract to name/cohortYear/campus/phone/city.
  * Never widen it — `systemRole` and `onboardingComplete` must not be settable from a
  * request body. That is the same privilege-escalation hole that `input: false` closes on
  * the Better Auth sign-up route.
@@ -92,10 +97,18 @@ export async function completeOnboarding(
   userId: string,
   input: CompleteOnboardingInput,
 ): Promise<{ user: PublicUser }> {
+  const { mentorCode, ...profileFields } = input
+
+  let systemRole: 'student' | 'mentor' | 'admin' = 'student'
+  if (mentorCode && process.env.MENTOR_SIGNUP_CODE && mentorCode === process.env.MENTOR_SIGNUP_CODE) {
+    systemRole = 'mentor'
+  }
+
   const [row] = await db
     .update(user)
     .set({
-      ...definedOnly(input), // ngoRole / organization / phone / city only
+      ...definedOnly(profileFields),
+      systemRole,
       onboardingComplete: true, // ← server-owned, never from `input`
       updatedAt: new Date(),
     })
