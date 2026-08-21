@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from './_kit'
-import { suggestedXpFromScore } from '@/lib/xp'
+import { applyTrack, suggestedXpFromScore } from '@/lib/xp'
 import {
   mockAssessmentContext,
   mockCoachBrief,
@@ -11,7 +11,7 @@ import {
 /**
  * FEATURE 05 — THE AI COACH. The USP.
  *
- *   Backend  `feature/ai-coach-back`   Yash   -> src/server/ai-coach.ts, src/lib/anthropic.ts
+ *   Backend  `feature/ai-coach-back`   Yash   -> src/server/ai-coach.ts, src/lib/ai.ts
  *   Frontend `feature/ai-coach-front`  Riya   -> src/components/ai/*, src/lib/ai-prompts.ts
  *
  * Design doc: plans/katalyst/ai-coach.md
@@ -54,9 +54,9 @@ export const ReviewConfidence = z.enum(['low', 'medium', 'high'])
 export type ReviewConfidence = z.infer<typeof ReviewConfidence>
 
 /**
- * THIS EXACT OBJECT is passed to `zodOutputFormat()` in the model call:
+ * THIS EXACT OBJECT becomes the responseJsonSchema in the model call:
  *
- *   output_config: { format: zodOutputFormat(AiReviewPayload), effort: 'medium' }
+ *   generateJson({ system, prompt, schema: AiReviewPayload })
  *
  * One definition means the model literally cannot return a shape Riya's UI does not
  * expect. Adding a field here changes what the model is asked to produce — so it is a
@@ -107,12 +107,17 @@ export const AiReview = AiReviewPayload.extend({
   /** COMPUTED from suggestedScore. Advice only — never written to xp_events. */
   suggestedXp: z.number().int(),
   maxScore: z.number().int(),
-  /** The ceiling the mentor's finalXp is clamped to. Shown as "/ 150 max". */
+  /**
+   * The EFFECTIVE ceiling the mentor's finalXp is clamped to, already track-adjusted
+   * (an optional course multiplies it by 1.5). Shown next to the XP input as "/ N max".
+   * `src/server/mentor.ts` -> decide() clamps to THIS number, not to the raw
+   * assessment.xpAward, so the mentor never accepts a suggestion the server then reduces.
+   */
   xpAward: z.number().int(),
   /** Drives the 1.5x chip next to the predicted XP. */
   track: z.enum(['mandatory', 'optional']),
 
-  /** Shown in the card header — "claude-opus-5 · 14.2s · confidence: high". */
+  /** Shown in the card header — "gemini-2.5-flash · 6.2s · confidence: high". */
   model: z.string(),
   latencyMs: z.number().int(),
   /** True for a draft preview. `mentor.getForReview()` only ever shows `false`. */
@@ -132,16 +137,23 @@ const toAiReview = (
   assessmentId: mockAssessmentContext.id,
   assessmentTitle: mockAssessmentContext.title,
   courseTitle: mockAssessmentContext.courseTitle,
-  suggestedXp: suggestedXpFromScore(
-    payload.suggestedScore,
-    mockAssessmentContext.maxScore,
-    mockAssessmentContext.xpAward,
-    mockAssessmentContext.track,
+  // Mirrors src/server/ai-coach.ts -> xpCeiling()/xpFor() EXACTLY. If these two ever
+  // disagree, a page built against the mock shows different numbers once the handler goes
+  // live, which is the precise failure the mock layer exists to prevent.
+  suggestedXp: Math.min(
+    suggestedXpFromScore(
+      payload.suggestedScore,
+      mockAssessmentContext.maxScore,
+      mockAssessmentContext.xpAward,
+      mockAssessmentContext.track,
+    ),
+    applyTrack(mockAssessmentContext.xpAward, mockAssessmentContext.track),
   ),
   maxScore: mockAssessmentContext.maxScore,
-  xpAward: mockAssessmentContext.xpAward,
+  /** The EFFECTIVE (track-adjusted) ceiling, same as the live handler returns. */
+  xpAward: applyTrack(mockAssessmentContext.xpAward, mockAssessmentContext.track),
   track: mockAssessmentContext.track,
-  model: 'claude-opus-5',
+  model: 'gemini-3.5-flash (mock)',
   createdAt: '2026-08-21T06:42:00.000Z',
 })
 
@@ -242,7 +254,7 @@ export const brief = defineContract({
 // ---------------------------------------------------------------------------
 
 /**
- * Mentor authoring copilot. Same machinery as `review` — `messages.parse` with a different
+ * Mentor authoring copilot. Same machinery as `review` — `generateJson()` with a different
  * schema and a different prompt — which is why it costs ~40 minutes rather than two hours.
  *
  * The draft is NEVER saved directly. It fills the wizard's editable fields and the mentor

@@ -12,10 +12,12 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/db/seed.ts",
-    "auth:generate": "npx auth@latest generate"
+    "auth:generate": "npx auth@latest generate",
+    "ai:smoke": "tsx src/scripts/ai-coach-smoke.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.29",
+    "@google/genai": "^2.18.0",
     "@hookform/resolvers": "^5.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "better-auth": "^1.6.29",
