@@ -1,7 +1,7 @@
 # 05 — AI Coach ⭐ THE USP
 
 **Priority:** MUST — this is the project · **Gate:** B (T+3:00)
-**Backend:** Yash · **Frontend + prompts:** Riya
+**Backend:** Yash · **Frontend + prompts:** Riya · **Branch:** `feature/ai-coach`
 **Contract:** `src/contracts/ai-coach.ts` · **Server:** `src/server/ai-coach.ts` ·
 **Prompts:** `src/lib/ai-prompts.ts` · **Routes:** `src/app/api/ai-coach/*`
 

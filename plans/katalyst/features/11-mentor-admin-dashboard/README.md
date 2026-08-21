@@ -1,7 +1,7 @@
 # 11 — Mentor & admin dashboard + reports
 
 **Priority:** MUST · **Gate:** C · **Backend:** Siddesh (reports) + Riya (`mentor.students`)
-· **Frontend:** Samya
+· **Frontend:** Makarand · **Branch:** `feature/admin`
 **Contracts:** `src/contracts/mentor.ts`, `src/contracts/admin.ts`
 **Pages:** `src/app/(mentor)/dashboard`, `src/app/(mentor)/students`,
 `src/app/(mentor)/admin/reports`

@@ -1,7 +1,7 @@
 # 02 — Courses: catalog, authoring, sections, lessons
 
 **Priority:** MUST · **Gate:** A (read path) / C (authoring UI) · **Backend:** Siddesh ·
-**Frontend:** Samya
+**Frontend:** Samya · **Branch:** `feature/courses`
 **Contract:** `src/contracts/courses.ts` · **Server:** `src/server/courses.ts` ·
 **Routes:** `src/app/api/courses/*`
 

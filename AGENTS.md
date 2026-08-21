@@ -217,14 +217,81 @@ adding features in the same hour edit two different lines.
 `src/contracts/_kit.ts`, `src/server/route.ts`, `src/lib/api-client.ts`, `src/lib/auth.ts`,
 `src/middleware.ts`, `src/lib/xp.ts`, `AGENTS.md`.
 
+### Feature pairing — who does the frontend, who does the backend
+
+Every feature has exactly one backend owner and exactly one frontend owner. Full table,
+per-pair handshakes and the file boundaries between them:
+**[`plans/katalyst/team-and-branching.md`](./plans/katalyst/team-and-branching.md)**.
+
+| # | Feature | Branch | Backend | Frontend |
+|---|---|---|---|---|
+| 00 | Foundation | `feature/foundation` | Yash + Siddesh | — |
+| 01 | Auth & onboarding | `feature/auth` | Samya | Samya |
+| 02 | Courses — catalog & player | `feature/courses` | Siddesh | Samya |
+| 03 | Enrolment & progress | `feature/progress` | Ayush | Methika |
+| 04 | Assessments & submissions | `feature/submissions` | Ayush | Samya |
+| 05 | **AI Coach** | `feature/ai-coach` | Yash | Riya |
+| 06 | XP engine & ledger | `feature/xp` | Yash | Methika |
+| 07 | Mentor review & final XP | `feature/mentor-review` | Riya | Riya |
+| 08 | Gamification | `feature/gamification` | Makarand | Makarand |
+| 09 | Leaderboard | `feature/leaderboard` | Makarand | Methika |
+| 10 | Student dashboard | `feature/dashboard` | Ayush | Methika |
+| 11 | Mentor & admin, authoring, reports | `feature/admin` | Siddesh | Makarand |
+| 12 | Notifications *(good-to-have)* | `feature/notifications` | Makarand | Makarand |
+| 13 | Mentor AI assist *(good-to-have)* | `feature/ai-assist` | Riya | Riya |
+| 14 | Teams *(good-to-have)* | `feature/teams` | Siddesh | Methika |
+
+### Branch model
+
+```
+main
+ │
+ └── feature/<feature>            <- integration branch, created by the BACKEND owner
+        ├── feature/<feature>-front    <- the frontend owner
+        └── feature/<feature>-back     <- the backend owner
+
+Frontend ──┐
+           ├──→ feature/<feature> ──→ TEST ──→ main
+Backend ───┘
+```
+
+1. **Nobody works on `main`. Nobody pushes to `main`.**
+2. Frontend and backend of a feature live on separate branches.
+3. Both merge into the feature's integration branch **by PR**.
+4. The complete feature is tested **on the integration branch**.
+5. Only after testing does `feature/<feature>` go to `main`, by PR.
+6. Before starting a new feature, `git switch main && git pull origin main`.
+
+```bash
+# start a feature (backend owner does this, then tells their pair)
+git switch main && git pull origin main
+git switch -c feature/courses && git push -u origin feature/courses
+
+# each half
+git switch feature/courses && git pull origin feature/courses
+git switch -c feature/courses-front     # or -back
+git add . && git commit -m "feat: catalog grid" && git push -u origin feature/courses-front
+# PR: feature/courses-front -> feature/courses
+```
+
+**Exception — `feature/foundation` merges to `main` first**, before any other branch
+exists, because every other branch is cut from `main` after it. Nobody creates a feature
+branch until it has landed.
+
 ### Git rules for six hours
 
-- Branch per feature: `feat/<id>-<name>` (e.g. `feat/05-ai-coach`).
 - **Push at least every 30 minutes.** A branch that has not been pushed does not exist.
-- **Rebase, never merge**: `git pull --rebase origin main`.
-- `npm run typecheck` before every push. A red `main` costs seven people at once.
-- Squash-merge to `main`. Do not review for style — review for "does it typecheck and does
-  the contract match".
+- **Rebase on your integration branch, not on main**:
+  `git pull --rebase origin feature/<feature>`. Every 30 minutes.
+- `npm run typecheck` before every push. A red branch costs your pair; a red `main` costs
+  seven people at once.
+- **Neither `-front` nor `-back` edits `src/contracts/<feature>.ts`.** The contract is
+  landed in foundation. A real change is made on the integration branch by the backend
+  owner, both sides rebase, and it is announced in the channel.
+- Squash-merge everything. Do not review for style — review for "does it typecheck and does
+  the handler output match the contract".
+- **After Gate C (T+4:15):** `fix/*` branches straight to `main` by PR. No integration
+  branch, no ceremony.
 
 ---
 

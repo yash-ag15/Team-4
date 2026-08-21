@@ -1,6 +1,6 @@
 # 08 — Gamification: check-in, streaks, badges, challenges
 
-**Priority:** MUST · **Gate:** C · **Backend:** Makarand · **Frontend:** Makarand
+**Priority:** MUST · **Gate:** C · **Backend:** Makarand · **Frontend:** Makarand · **Branch:** `feature/gamification`
 **Contract:** `src/contracts/gamification.ts` · **Server:** `src/server/gamification.ts` ·
 **Routes:** `src/app/api/gamification/*` · **Components:** `src/components/game/*`
 

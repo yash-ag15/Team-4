@@ -1,7 +1,7 @@
 # 13 — Mentor AI assist (course authoring copilot)
 
 **Priority: GOOD-TO-HAVE.** Do not start before Gate C (T+4:15) is green.
-**Owner:** Riya (both halves) · **Est:** 40 min
+**Owner:** Riya (both halves) · **Branch:** `feature/ai-assist` · **Est:** 40 min
 **Contract:** `src/contracts/ai-coach.ts` → `draftCourse` ·
 **Server:** `src/server/ai-coach.ts` → `draftCourse()`
 

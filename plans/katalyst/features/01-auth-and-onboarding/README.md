@@ -1,6 +1,6 @@
 # 01 — Auth, roles & onboarding
 
-**Priority:** MUST · **Gate:** A (T+1:30) · **Backend:** Samya · **Frontend:** Samya
+**Priority:** MUST · **Gate:** A (T+1:30) · **Backend:** Samya · **Frontend:** Samya · **Branch:** `feature/auth`
 **Contract:** `src/contracts/users.ts` · **Server:** `src/server/users.ts` ·
 **Routes:** `src/app/api/users/*`
 
