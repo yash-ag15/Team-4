@@ -45,16 +45,19 @@ export function AppShell({ user, children }: AppShellProps) {
     { href: '/badges', label: 'Badges' },
   ]
 
+  // Mentor and admin pages live under /mentor/*, behind the guard in
+  // src/app/mentor/layout.tsx. /dashboard is the STUDENT route — linking a mentor there
+  // would bounce them straight back out via that guard.
   const mentorLinks: { href: string; label: string; count?: number }[] = [
-    { href: '/dashboard', label: 'Dashboard' },
-    { href: '/review', label: 'Review Queue', count: pendingCount },
+    { href: '/mentor/dashboard', label: 'Dashboard' },
+    { href: '/mentor/review', label: 'Review Queue', count: pendingCount },
     { href: '/learn', label: 'My Courses' },
-    { href: '/students', label: 'Students' },
+    { href: '/mentor/students', label: 'Students' },
   ]
 
   if (user.systemRole === 'admin') {
-    mentorLinks.push({ href: '/admin/authoring', label: 'Authoring' })
-    mentorLinks.push({ href: '/admin/reports', label: 'Reports' })
+    mentorLinks.push({ href: '/mentor/admin/reports', label: 'Reports' })
+    mentorLinks.push({ href: '/mentor/admin/users', label: 'User Roles' })
   }
 
   const links = user.systemRole === 'student' ? studentLinks : mentorLinks

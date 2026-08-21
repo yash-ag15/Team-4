@@ -99,10 +99,31 @@ export async function completeOnboarding(
 ): Promise<{ user: PublicUser }> {
   const { mentorCode, ...profileFields } = input
 
-  let systemRole: 'student' | 'mentor' | 'admin' = 'student'
-  if (mentorCode && process.env.MENTOR_SIGNUP_CODE && mentorCode === process.env.MENTOR_SIGNUP_CODE) {
-    systemRole = 'mentor'
-  }
+  // Read the role this account ALREADY has. Without this the write below is a demotion:
+  // `systemRole` used to be re-derived from scratch on every submit, so an existing
+  // mentor who re-ran onboarding without retyping the code — or any admin finishing
+  // onboarding for the first time — was silently reset to 'student' and started landing
+  // on /dashboard instead of /mentor/dashboard.
+  const [existing] = await db
+    .select({ systemRole: user.systemRole })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
+  if (!existing) throw new ApiError('NOT_FOUND', 'User not found')
+
+  // Older rows carry a legacy 'user' value from the starter schema; it means student.
+  const currentRole: 'student' | 'mentor' | 'admin' =
+    existing.systemRole === 'mentor' || existing.systemRole === 'admin'
+      ? existing.systemRole
+      : 'student'
+
+  const codeAccepted =
+    !!mentorCode && !!process.env.MENTOR_SIGNUP_CODE && mentorCode === process.env.MENTOR_SIGNUP_CODE
+
+  // A valid code PROMOTES a student to mentor. It never changes an admin (that would be a
+  // downgrade), and a missing or wrong code leaves the existing role untouched.
+  const systemRole: 'student' | 'mentor' | 'admin' =
+    codeAccepted && currentRole === 'student' ? 'mentor' : currentRole
 
   const [row] = await db
     .update(user)

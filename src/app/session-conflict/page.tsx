@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/lib/auth'
+import { landingPathFor } from '@/lib/landing'
 import { listSessions } from '@/server/sessions'
 
 import { SessionConflict } from './session-conflict'
@@ -25,12 +26,13 @@ export default async function SessionConflictPage() {
 
   // The other device signed itself out between /post-auth and here — nothing to resolve.
   if (others.length === 0) {
-    redirect(session.user.onboardingComplete ? '/dashboard' : '/onboarding')
+    redirect(landingPathFor(session.user))
   }
 
   // Computed, never taken from a query parameter: a `?next=` on a page that runs
-  // immediately after sign-in is an open redirect waiting to happen.
-  const continueHref = session.user.onboardingComplete ? '/dashboard' : '/onboarding'
+  // immediately after sign-in is an open redirect waiting to happen. Same role-aware
+  // rule /post-auth uses, so resolving a conflict lands you where signing in would have.
+  const continueHref = landingPathFor(session.user)
 
   return <SessionConflict sessions={others} email={session.user.email} continueHref={continueHref} />
 }
