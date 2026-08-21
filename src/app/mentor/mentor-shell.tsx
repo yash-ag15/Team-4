@@ -4,6 +4,8 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { SignOutButton } from '@/components/auth/sign-out-button'
+
 interface MentorShellProps {
   children: React.ReactNode
 }
@@ -71,6 +73,8 @@ export function MentorShell({ children }: MentorShellProps) {
               <span>Student View</span>
               <span className="text-pink-500 font-bold">→</span>
             </Link>
+
+            <SignOutButton className="text-xs font-semibold text-slate-700 hover:text-pink-600 px-3.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 hover:border-pink-400/50 transition shadow-xs disabled:opacity-50" />
           </div>
 
         </div>

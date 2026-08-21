@@ -12,9 +12,9 @@
 
 /** Mentors and admins share the mentor/admin dashboard. */
 export const MENTOR_HOME = '/mentor/dashboard'
-/** Students land on the public home page after signing in, then choose to go further. */
-export const STUDENT_HOME = '/'
-/** The student dashboard itself — reached from the home page, not landed on directly. */
+/** Students land straight on their dashboard, same as mentors land on theirs. */
+export const STUDENT_HOME = '/dashboard'
+/** The student dashboard. Same route as STUDENT_HOME — students land on it directly. */
 export const STUDENT_DASHBOARD = '/dashboard'
 /** The gate everyone passes through exactly once. */
 export const ONBOARDING = '/onboarding'
