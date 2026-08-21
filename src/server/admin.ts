@@ -66,17 +66,22 @@ export async function createCourse(input: CreateCourseInput): Promise<{ course: 
     throw new ApiError('CONFLICT', `A course with slug "${slug}" already exists`)
   }
 
-  const mentorId = input.mentorId || 'user-1'
-  if (input.mentorId) {
+  let mentorId = input.mentorId
+  if (mentorId) {
     const [mentorRow] = await db
       .select({ id: user.id })
       .from(user)
-      .where(eq(user.id, input.mentorId))
+      .where(eq(user.id, mentorId))
       .limit(1)
 
     if (!mentorRow) {
-      throw new ApiError('NOT_FOUND', `Mentor with user ID "${input.mentorId}" does not exist`)
+      mentorId = undefined
     }
+  }
+
+  if (!mentorId) {
+    const [firstUser] = await db.select({ id: user.id }).from(user).limit(1)
+    mentorId = firstUser?.id || 'user-1'
   }
 
   const courseId = input.id || `course-${randomUUID().slice(0, 8)}`
@@ -580,17 +585,14 @@ function toAdminUserRow(u: typeof user.$inferSelect): admin.AdminUserRow {
 // Helper: maps a course row to AdminModule
 // ============================================================================
 
-function toAdminModule(c: typeof courses.$inferSelect): admin.AdminModule {
+function toAdminModule(s: typeof courseSections.$inferSelect): admin.AdminModule {
   return {
-    id: c.id,
-    title: c.title,
-    description: c.description,
-    difficulty: c.difficulty as admin.CourseDifficulty,
-    durationMin: (c.estimatedHours ?? 0) * 60,
-    category: c.category,
-    track: c.track as admin.CourseTrack,
-    status: c.status as admin.CourseStatus,
-    createdAt: c.createdAt.toISOString(),
+    id: s.id,
+    courseId: s.courseId,
+    title: s.title,
+    description: s.summary || '',
+    order: s.orderIndex,
+    createdAt: s.createdAt.toISOString(),
   }
 }
 
@@ -601,7 +603,6 @@ function toAdminModule(c: typeof courses.$inferSelect): admin.AdminModule {
 function toAdminTask(a: typeof assessments.$inferSelect): admin.AdminTask {
   let rubricData: {
     evaluationCriteria?: admin.EvaluationCriterion[]
-    taskData?: Record<string, unknown>
     status?: 'active' | 'inactive'
   } = {}
 
@@ -615,50 +616,37 @@ function toAdminTask(a: typeof assessments.$inferSelect): admin.AdminTask {
 
   return {
     id: a.id,
-    moduleId: a.courseId,
+    moduleId: a.sectionId || a.courseId,
     title: a.title,
     description: a.prompt,
     xp: a.xpAward,
     maxMarks: a.maxScore,
     evaluationCriteria: rubricData.evaluationCriteria ?? [],
-    taskData: rubricData.taskData,
     status: (rubricData.status ?? 'active') as admin.TaskStatus,
     createdAt: a.createdAt.toISOString(),
   }
 }
 
 // ============================================================================
-// Module CRUD (AdminModule maps to courses table)
+// Module CRUD (AdminModule maps to courseSections table)
 // ============================================================================
 
 export async function createModule(
   input: z.infer<(typeof admin.createModule)['input']>,
-  adminId: string,
 ): Promise<{ module: admin.AdminModule }> {
-  const slugBase = input.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-  const slug = `${slugBase}-${randomUUID().slice(0, 6)}`
+  const [course] = await db.select({ id: courses.id }).from(courses).where(eq(courses.id, input.id)).limit(1)
+  if (!course) throw new ApiError('NOT_FOUND', `Course "${input.id}" not found`)
 
+  const moduleId = `mod-${randomUUID().slice(0, 8)}`
   const [inserted] = await db
-    .insert(courses)
+    .insert(courseSections)
     .values({
-      id: `module-${randomUUID().slice(0, 8)}`,
-      slug,
+      id: moduleId,
+      courseId: input.id,
       title: input.title,
-      subtitle: '',
-      description: input.description ?? '',
-      coverEmoji: '📘',
-      category: input.category as 'technical' | 'business' | 'communication' | 'leadership' | 'wellbeing',
-      track: input.track as 'mandatory' | 'optional',
-      difficulty: input.difficulty as 'beginner' | 'intermediate' | 'advanced',
-      certificateEligible: false,
-      estimatedHours: Math.ceil((input.durationMin ?? 60) / 60),
-      xpBonusOnComplete: 100,
-      dueAt: null,
-      status: 'draft' as const,
-      mentorId: adminId,
+      summary: input.description ?? '',
+      orderIndex: input.order ?? 0,
+      xpAward: 50,
     })
     .returning()
 
@@ -667,19 +655,13 @@ export async function createModule(
 }
 
 export async function listModules(
-  input: z.infer<(typeof admin.listModules)['input']> = {},
+  input: z.infer<(typeof admin.listModules)['input']>,
 ): Promise<{ modules: admin.AdminModule[] }> {
-  const conditions = [
-    input.status ? eq(courses.status, input.status as any) : undefined,
-    input.track ? eq(courses.track, input.track as any) : undefined,
-  ].filter(Boolean)
-
   const rows = await db
     .select()
-    .from(courses)
-    .where(conditions.length ? and(...(conditions as any[])) : undefined)
-    .orderBy(desc(courses.createdAt))
-    .limit(input.limit ?? 50)
+    .from(courseSections)
+    .where(eq(courseSections.courseId, input.id))
+    .orderBy(courseSections.orderIndex)
 
   return { modules: rows.map(toAdminModule) }
 }
@@ -687,7 +669,7 @@ export async function listModules(
 export async function getModule(
   input: z.infer<(typeof admin.getModule)['input']>,
 ): Promise<{ module: admin.AdminModule }> {
-  const [row] = await db.select().from(courses).where(eq(courses.id, input.id)).limit(1)
+  const [row] = await db.select().from(courseSections).where(eq(courseSections.id, input.id)).limit(1)
   if (!row) throw new ApiError('NOT_FOUND', `Module "${input.id}" not found`)
   return { module: toAdminModule(row) }
 }
@@ -695,19 +677,15 @@ export async function getModule(
 export async function updateModule(
   input: z.infer<(typeof admin.updateModule)['input']>,
 ): Promise<{ module: admin.AdminModule }> {
-  const updates: Partial<typeof courses.$inferInsert> = {}
+  const updates: Partial<typeof courseSections.$inferInsert> = {}
   if (input.title !== undefined) updates.title = input.title
-  if (input.description !== undefined) updates.description = input.description
-  if (input.difficulty !== undefined) updates.difficulty = input.difficulty as any
-  if (input.durationMin !== undefined) updates.estimatedHours = Math.ceil(input.durationMin / 60)
-  if (input.category !== undefined) updates.category = input.category as any
-  if (input.track !== undefined) updates.track = input.track as any
-  if (input.status !== undefined) updates.status = input.status as any
+  if (input.description !== undefined) updates.summary = input.description
+  if (input.order !== undefined) updates.orderIndex = input.order
 
   const [updated] = await db
-    .update(courses)
+    .update(courseSections)
     .set(updates)
-    .where(eq(courses.id, input.id))
+    .where(eq(courseSections.id, input.id))
     .returning()
 
   if (!updated) throw new ApiError('NOT_FOUND', `Module "${input.id}" not found`)
@@ -721,29 +699,34 @@ export async function updateModule(
 export async function createTask(
   input: z.infer<(typeof admin.createTask)['input']>,
 ): Promise<{ task: admin.AdminTask }> {
-  // Verify the module (course) exists
-  const [course] = await db.select({ id: courses.id }).from(courses).where(eq(courses.id, input.id)).limit(1)
-  if (!course) throw new ApiError('NOT_FOUND', `Module "${input.id}" not found`)
+  const [section] = await db.select().from(courseSections).where(eq(courseSections.id, input.id)).limit(1)
+  let courseId = input.id
+  let sectionId: string | null = null
+  if (section) {
+    courseId = section.courseId
+    sectionId = section.id
+  } else {
+    const [course] = await db.select({ id: courses.id }).from(courses).where(eq(courses.id, input.id)).limit(1)
+    if (!course) throw new ApiError('NOT_FOUND', `Module/Course "${input.id}" not found`)
+  }
 
-  // Auto-assign orderIndex
   const existingCount = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(assessments)
-    .where(eq(assessments.courseId, input.id))
+    .where(sectionId ? eq(assessments.sectionId, sectionId) : eq(assessments.courseId, courseId))
   const orderIndex = (existingCount[0]?.count ?? 0) + 1
 
   const rubric = JSON.stringify({
     evaluationCriteria: input.evaluationCriteria,
-    taskData: input.taskData ?? {},
-    status: 'active',
+    status: input.status,
   })
 
   const [inserted] = await db
     .insert(assessments)
     .values({
       id: `task-${randomUUID().slice(0, 8)}`,
-      courseId: input.id,
-      sectionId: null,
+      courseId,
+      sectionId,
       title: input.title,
       prompt: input.description,
       rubric,
@@ -764,7 +747,12 @@ export async function listTasks(
   const rows = await db
     .select()
     .from(assessments)
-    .where(eq(assessments.courseId, input.id))
+    .where(
+      or(
+        eq(assessments.courseId, input.id),
+        eq(assessments.sectionId, input.id),
+      ),
+    )
     .orderBy(assessments.orderIndex)
 
   return { tasks: rows.map(toAdminTask) }
@@ -804,7 +792,7 @@ export async function updateTask(
   const updatedRubric = JSON.stringify({
     ...rubricData,
     evaluationCriteria: input.evaluationCriteria ?? rubricData.evaluationCriteria ?? [],
-    taskData: input.taskData ?? rubricData.taskData ?? {},
+    status: input.status ?? rubricData.status ?? 'active',
   })
 
   const [updated] = await db
@@ -972,19 +960,29 @@ export async function listUsers(
 export async function setRole(
   input: z.infer<(typeof admin.setRole)['input']>,
   adminId: string,
-): Promise<{ user: admin.AdminUserRow }> {
-  if (input.id === adminId) {
+): Promise<z.infer<(typeof admin.setRole)['output']>> {
+  const targetId = input.id || input.userId
+  if (!targetId) {
+    throw new ApiError('VALIDATION_ERROR', 'User ID is required')
+  }
+
+  if (targetId === adminId) {
     throw new ApiError('FORBIDDEN', 'You cannot change your own role')
   }
 
   const [updated] = await db
     .update(user)
     .set({ systemRole: input.role })
-    .where(eq(user.id, input.id))
+    .where(eq(user.id, targetId))
     .returning()
 
-  if (!updated) throw new ApiError('NOT_FOUND', `User "${input.id}" not found`)
-  return { user: toAdminUserRow(updated) }
+  if (!updated) throw new ApiError('NOT_FOUND', `User "${targetId}" not found`)
+  return {
+    success: true,
+    userId: updated.id,
+    role: updated.systemRole as admin.SystemRole,
+    user: toAdminUserRow(updated),
+  }
 }
 
 // ============================================================================
@@ -1156,10 +1154,10 @@ export async function listStudents(
       if (changesOldByUser.has(u.id)) flags.push('awaiting_resubmit')
 
       // Apply flag filter if requested
-      if (input.flag && !flags.includes(input.flag)) return null
+      if (input.flag && flags[0] !== input.flag) return null
 
-      return {
-        userId: u.id,
+      const studentRow: admin.AdminStudentRow = {
+        id: u.id,
         name: u.name,
         email: u.email,
         image: u.image ?? null,
@@ -1171,9 +1169,10 @@ export async function listStudents(
         coursesCompleted,
         avgProgressPct,
         lastActiveAt: lastActiveAt ?? null,
-        pendingSubmissions: pendingByUser[u.id] ?? 0,
-        flags,
-      } satisfies admin.AdminStudentRow
+        flag: flags[0] ?? null,
+        flagReason: flags.length > 0 ? `Flagged: ${flags.join(', ')}` : null,
+      }
+      return studentRow
     })
     .filter((s): s is admin.AdminStudentRow => s !== null)
 
@@ -1187,15 +1186,8 @@ export async function listStudents(
 export async function studentPerformance(
   input: z.infer<(typeof admin.studentPerformance)['input']>,
 ): Promise<z.infer<(typeof admin.studentPerformance)['output']>> {
-  // Reuse listStudents for the aggregated student row
-  const { students } = await listStudents({ limit: 1, q: input.userId })
-  // If not found by q search, try direct ID lookup
   const [userRow] = await db.select().from(user).where(eq(user.id, input.userId)).limit(1)
   if (!userRow) throw new ApiError('NOT_FOUND', `Student "${input.userId}" not found`)
-
-  // Compute the student row directly
-  const { students: [studentRow] } = await listStudents({ limit: 100 })
-  // Actually let's just do direct lookups
 
   const myEnrollments = await db
     .select({
@@ -1215,7 +1207,7 @@ export async function studentPerformance(
   const mySubmissions = await db
     .select({
       id: submissions.id,
-      assessmentTitle: assessments.title,
+      taskTitle: assessments.title,
       courseTitle: courses.title,
       status: submissions.status,
       maxScore: assessments.maxScore,
@@ -1229,27 +1221,6 @@ export async function studentPerformance(
     .where(eq(submissions.studentId, input.userId))
     .orderBy(desc(submissions.submittedAt))
 
-  // Evaluations = mentor-approved submissions with notes
-  const myEvaluations = await db
-    .select({
-      id: submissions.id,
-      assessmentTitle: assessments.title,
-      score: submissions.finalScore,
-      xpAwarded: submissions.finalXp,
-      feedback: submissions.mentorNote,
-      evaluatedAt: submissions.reviewedAt,
-    })
-    .from(submissions)
-    .innerJoin(assessments, eq(submissions.assessmentId, assessments.id))
-    .where(
-      and(
-        eq(submissions.studentId, input.userId),
-        eq(submissions.status, 'mentor_approved'),
-      ),
-    )
-    .orderBy(desc(submissions.reviewedAt))
-
-  // Build student summary
   const xpRows = await db
     .select({ total: sql<number>`coalesce(sum(${xpEvents.amount}), 0)::int` })
     .from(xpEvents)
@@ -1258,7 +1229,7 @@ export async function studentPerformance(
   const totalXp = xpRows[0]?.total ?? 0
 
   const studentSummary: admin.AdminStudentRow = {
-    userId: userRow.id,
+    id: userRow.id,
     name: userRow.name,
     email: userRow.email,
     image: userRow.image ?? null,
@@ -1273,44 +1244,29 @@ export async function studentPerformance(
         ? Math.round(myEnrollments.reduce((a, e) => a + e.progressPct, 0) / myEnrollments.length)
         : 0,
     lastActiveAt: null,
-    pendingSubmissions: mySubmissions.filter((s) =>
-      ['submitted', 'ai_reviewed'].includes(s.status),
-    ).length,
-    flags: [],
+    flag: null,
+    flagReason: null,
   }
 
   return {
     student: studentSummary,
-    enrollments: myEnrollments.map((e) => ({
+    enrolledCourses: myEnrollments.map((e) => ({
       courseId: e.courseId,
       courseTitle: e.courseTitle,
       track: e.track as admin.CourseTrack,
       progressPct: e.progressPct,
-      xpEarned: e.xpEarned,
-      status: e.status as admin.EnrollmentStatus,
       enrolledAt: e.enrolledAt.toISOString(),
       completedAt: e.completedAt ? e.completedAt.toISOString() : null,
     })),
     submissions: mySubmissions.map((s) => ({
       id: s.id,
-      assessmentTitle: s.assessmentTitle,
-      courseTitle: s.courseTitle,
+      taskTitle: s.taskTitle,
       status: s.status as admin.SubmissionStatus,
-      maxScore: s.maxScore,
-      score: s.score ?? null,
-      xpAwarded: s.xpAwarded ?? null,
+      aiScore: s.score ?? null,
+      mentorScore: s.score ?? null,
+      finalXp: s.xpAwarded ?? null,
       submittedAt: s.submittedAt.toISOString(),
     })),
-    evaluations: myEvaluations
-      .filter((e) => e.evaluatedAt !== null)
-      .map((e) => ({
-        id: e.id,
-        assessmentTitle: e.assessmentTitle,
-        score: e.score ?? 0,
-        xpAwarded: e.xpAwarded ?? 0,
-        feedback: e.feedback || '',
-        evaluatedAt: e.evaluatedAt!.toISOString(),
-      })),
   }
 }
 
@@ -1324,21 +1280,27 @@ export async function listEvaluations(
   const conditions = [
     input.status ? eq(submissions.status, input.status as any) : undefined,
     input.courseId ? eq(assessments.courseId, input.courseId) : undefined,
-    input.studentId ? eq(submissions.studentId, input.studentId) : undefined,
+    input.mentorId ? eq(submissions.mentorId, input.mentorId) : undefined,
   ].filter(Boolean) as any[]
 
   const rows = await db
     .select({
-      submissionId: submissions.id,
+      id: submissions.id,
       studentId: submissions.studentId,
       studentName: user.name,
-      assessmentId: assessments.id,
-      assessmentTitle: assessments.title,
+      studentEmail: user.email,
+      courseId: courses.id,
       courseTitle: courses.title,
+      taskId: assessments.id,
+      taskTitle: assessments.title,
       score: submissions.finalScore,
       xpAwarded: submissions.finalXp,
       status: submissions.status,
-      feedback: submissions.mentorNote,
+      aiScore: submissions.aiScore,
+      aiSuggestedXp: submissions.aiXpSuggested,
+      mentorScore: submissions.finalScore,
+      finalXp: submissions.finalXp,
+      mentorId: submissions.mentorId,
       submittedAt: submissions.submittedAt,
       evaluatedAt: submissions.reviewedAt,
     })
@@ -1352,18 +1314,22 @@ export async function listEvaluations(
 
   return {
     evaluations: rows.map((r) => ({
-      submissionId: r.submissionId,
+      id: r.id,
       studentId: r.studentId,
       studentName: r.studentName,
-      assessmentId: r.assessmentId,
-      assessmentTitle: r.assessmentTitle,
+      studentEmail: r.studentEmail,
+      courseId: r.courseId,
       courseTitle: r.courseTitle,
-      score: r.score ?? null,
-      xpAwarded: r.xpAwarded ?? null,
-      status: r.status as admin.SubmissionStatus,
-      feedback: r.feedback || null,
+      taskId: r.taskId,
+      taskTitle: r.taskTitle,
       submittedAt: r.submittedAt.toISOString(),
-      evaluatedAt: r.evaluatedAt ? r.evaluatedAt.toISOString() : null,
+      status: r.status as admin.SubmissionStatus,
+      aiScore: r.aiScore ?? null,
+      aiSuggestedXp: r.aiSuggestedXp ?? null,
+      mentorScore: r.mentorScore ?? null,
+      finalXp: r.finalXp ?? null,
+      mentorId: r.mentorId ?? null,
+      mentorName: null,
     })),
   }
 }

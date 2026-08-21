@@ -41,12 +41,16 @@ async function runTests() {
   })
 
   // 3. Admin listModules
-  await test('adminServer.listModules()', async () => {
-    const res = await adminServer.listModules({ limit: 10 })
-    if (!Array.isArray(res.modules)) throw new Error('Expected modules array')
-    console.log(`   -> Found ${res.modules.length} modules`)
-    return res
-  })
+  const coursesForMod = await adminServer.listCourses({ limit: 1 })
+  if (coursesForMod.courses.length > 0) {
+    const cid = coursesForMod.courses[0].id
+    await test(`adminServer.listModules({ id: '${cid}' })`, async () => {
+      const res = await adminServer.listModules({ id: cid })
+      if (!Array.isArray(res.modules)) throw new Error('Expected modules array')
+      console.log(`   -> Found ${res.modules.length} modules for course ${cid}`)
+      return res
+    })
+  }
 
   // 4. Admin getReport
   await test('adminServer.getReport()', async () => {
