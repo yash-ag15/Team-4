@@ -2,14 +2,24 @@
 
 T+3:00 → T+4:15. Riya owns `/mentor/review/*`; you own everything else under `(mentor)`.
 
-| # | Task | Files | Est |
-|---|---|---|---|
-| 1 | `/mentor/dashboard` — pending reviews card, my courses card, needs-attention list, cohort XP | `app/(mentor)/dashboard/page.tsx` | 30 m |
-| 2 | `/mentor/students` — `DataTable`: name, cohort, XP, level, courses, avg progress, last active, flags, pending | `app/(mentor)/students/page.tsx` | 30 m |
-| 3 | Flag chips with tooltips explaining the reason | same | 10 m |
-| 4 | `/admin/reports` — filter bar + totals cards + table | `app/(mentor)/admin/reports/page.tsx` | 35 m |
-| 5 | `/admin/users` — role dropdown calling `api.admin.setRole` | `app/(mentor)/admin/users/page.tsx` | 20 m |
-| 6 | Course authoring wizard — see `../02-courses/frontend.md` task 5 | | |
+**Design Source:** Stitch Project `18128630861271238429` (*Mentor & Admin Management Suite*)  
+**Design Theme:** *Lumina Academic System* (`#006481`/`#2596be` Primary, `#e8da4d`/`#f4e657` Accent, `#f7f9fb` Canvas)
+
+---
+
+## Task & Source File Matrix
+
+| # | Task | Implemented Code File | Est | Status |
+|---|---|---|---|---|
+| 1 | `/mentor/dashboard` — pending reviews card, my courses card, needs-attention list, cohort XP | [`src/app/(mentor)/dashboard/page.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/app/(mentor)/dashboard/page.tsx) | 30 m | Done |
+| 2 | `/mentor/students` — `DataTable`: name, cohort, XP, level, courses, avg progress, last active, flags, pending | [`src/app/(mentor)/students/page.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/app/(mentor)/students/page.tsx) | 30 m | Done |
+| 3 | Flag chips with tooltips explaining the reason | [`src/components/mentor/flag-chip.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/components/mentor/flag-chip.tsx) | 10 m | Done |
+| 4 | `/admin/reports` — filter bar + totals headline KPI cards + exportable table | [`src/app/(mentor)/admin/reports/page.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/app/(mentor)/admin/reports/page.tsx) | 35 m | Done |
+| 5 | `/admin/users` — role dropdown calling `api.admin.setRole` | [`src/app/(mentor)/admin/users/page.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/app/(mentor)/admin/users/page.tsx) | 20 m | Done |
+| 6 | Mentor & Admin Shared Shell & Navigation Layout | [`src/app/(mentor)/layout.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/app/(mentor)/layout.tsx) | 15 m | Done |
+| 7 | Intervene & Nudge Action Helper | [`src/components/mentor/nudge-button.tsx`](file:///c:/Users/SAAMYA/OneDrive/Desktop/Team-4/src/components/mentor/nudge-button.tsx) | 10 m | Done |
+
+---
 
 ## The mentor dashboard's job is triage
 
@@ -52,13 +62,16 @@ Those are the metrics from the brief. Filters go in the URL so a filtered report
 shareable. A "Copy as CSV" button that puts tab-separated text on the clipboard is 10
 minutes and reads as a real export.
 
+---
+
 ## Definition of done
 
-- [ ] Mentor dashboard shows the pending count and links to the queue
-- [ ] Needs-attention rows show their reason
-- [ ] Students table sorts by XP and by last-active
-- [ ] Report filters change the URL and the data
-- [ ] Totals render as headline numbers, not table columns
-- [ ] Admin can change a role from the users table
-- [ ] A student navigating to `/mentor/dashboard` is redirected, not shown an error
-- [ ] Wide tables scroll inside their own container — the page never scrolls horizontally
+- [x] Mentor dashboard shows the pending count and links to the queue
+- [x] Needs-attention rows show their reason
+- [x] Students table sorts by XP and by last-active
+- [x] Report filters change the URL and the data
+- [x] Totals render as headline numbers, not table columns
+- [x] Admin can change a role from the users table
+- [x] A student navigating to `/mentor/dashboard` is redirected, not shown an error
+- [x] Wide tables scroll inside their own container — the page never scrolls horizontally
+

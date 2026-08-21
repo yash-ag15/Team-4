@@ -11,5 +11,3 @@
 // Tables: user, session, account, verification.
 export * from './auth'
 
-export * from './projects'
-export * from './tasks'
