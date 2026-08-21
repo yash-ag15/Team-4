@@ -1,7 +1,7 @@
 # 12 — Notifications & escalations
 
 **Priority: GOOD-TO-HAVE.** Do not start before Gate C (T+4:15) is green.
-**Owner:** Makarand (both halves) · **Est:** 45 min
+**Owner:** Makarand (both halves) · **Branch:** `feature/notifications` · **Est:** 45 min
 **Contract:** `src/contracts/notifications.ts` · **Server:**
 `src/server/notifications.ts` · **Route:** `src/app/api/notifications`
 

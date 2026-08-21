@@ -1,7 +1,7 @@
 # 09 — Leaderboard
 
 **Priority:** MUST · **Gate:** C · **Backend:** Makarand (or Yash) ·
-**Frontend:** Methika
+**Frontend:** Methika · **Branch:** `feature/leaderboard`
 **Contract:** `src/contracts/xp.ts` → `leaderboard` · **Server:** `src/server/xp.ts` ·
 **Route:** `src/app/api/xp/leaderboard` · **Page:** `src/app/(student)/leaderboard`
 
