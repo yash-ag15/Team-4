@@ -47,7 +47,7 @@ export function CoachBrief({ brief }: { brief: CoachBriefData }) {
             <Link
               key={i}
               href={action.href}
-              className="rounded-md bg-[#2596BE] px-3 py-2 text-center text-sm font-medium text-white hover:bg-[#2ea7d6]"
+              className="rounded-md bg-[#2596BE] px-3 py-2 text-center text-sm font-medium text-white hover:bg-[#2596BE]/90"
             >
               {action.label} →
             </Link>
