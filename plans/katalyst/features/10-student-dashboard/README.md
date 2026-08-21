@@ -1,7 +1,7 @@
 # 10 — Student dashboard
 
 **Priority:** MUST · **Gate:** C · **Backend:** Ayush (`progress.overview`) ·
-**Frontend:** Methika
+**Frontend:** Methika · **Branch:** `feature/dashboard`
 **Contract:** `src/contracts/progress.ts` → `overview` ·
 **Page:** `src/app/(student)/dashboard`
 

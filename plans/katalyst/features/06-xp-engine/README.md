@@ -1,6 +1,6 @@
 # 06 — XP engine & ledger
 
-**Priority:** MUST · **Gate:** A · **Backend:** Yash · **Frontend:** Methika
+**Priority:** MUST · **Gate:** A · **Backend:** Yash · **Frontend:** Methika · **Branch:** `feature/xp`
 **Contract:** `src/contracts/xp.ts` · **Server:** `src/server/xp.ts` ·
 **Constants:** `src/lib/xp.ts` · **Routes:** `src/app/api/xp/*`
 

@@ -2,7 +2,7 @@
 
 **Priority: GOOD-TO-HAVE — the first thing on the cut list.** Do not start before Gate C
 (T+4:15) is green **and** features 12 and 13 are either done or consciously skipped.
-**Owner:** Siddesh (backend) + Methika (frontend) · **Est:** 40 min
+**Owner:** Siddesh (backend) + Methika (frontend) · **Branch:** `feature/teams` · **Est:** 40 min
 
 ---
 

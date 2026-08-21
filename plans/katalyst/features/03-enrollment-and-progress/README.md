@@ -1,6 +1,6 @@
 # 03 — Enrolment & progress
 
-**Priority:** MUST · **Gate:** A · **Backend:** Ayush · **Frontend:** Samya
+**Priority:** MUST · **Gate:** A · **Backend:** Ayush · **Frontend:** Methika · **Branch:** `feature/progress`
 **Contracts:** `src/contracts/enrollments.ts`, `src/contracts/progress.ts`
 **Server:** `src/server/enrollments.ts`, `src/server/progress.ts`
 **Routes:** `src/app/api/enrollments/*`, `src/app/api/progress/*`

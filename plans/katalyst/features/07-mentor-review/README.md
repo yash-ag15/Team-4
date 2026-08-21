@@ -1,7 +1,7 @@
 # 07 — Mentor review & final XP award
 
 **Priority:** MUST — the second half of the USP · **Gate:** B (T+3:00)
-**Backend:** Riya · **Frontend:** Riya
+**Backend:** Riya · **Frontend:** Riya · **Branch:** `feature/mentor-review`
 **Contract:** `src/contracts/mentor.ts` · **Server:** `src/server/mentor.ts` ·
 **Routes:** `src/app/api/mentor/*` · **Pages:** `src/app/(mentor)/review/*`
 

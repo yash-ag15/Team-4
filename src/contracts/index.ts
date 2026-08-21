@@ -1,9 +1,15 @@
 // The registry. Append-only: a new feature is one import line and one key,
 // so two people adding features on the same day touch two different lines.
-import * as projects from './projects'
-import * as tasks from './tasks'
-import * as users from './users'
+import * as admin from './admin'
+import * as courses from './courses'
 import * as enrollments from './enrollments'
+import * as sessions from './sessions'
+import * as users from './users'
+import * as userDashboard from './user-dashboard'
 
-export const contracts = { projects, tasks, users, enrollments }
+// Union of both sides: main's admin/courses/sessions/userDashboard plus this branch's
+// enrollments. The starter's `projects`/`tasks` are deliberately NOT here — their tables
+// are gone from src/db/schema, and HEAD listed them in this object without importing
+// them, so that side did not compile.
+export const contracts = { admin, courses, enrollments, sessions, users, userDashboard }
 export type Contracts = typeof contracts

@@ -41,6 +41,12 @@
 
   --font-headline-lg: 'Montserrat', sans-serif;
   --font-body-md: 'Inter', sans-serif;
+
+  /* Added for the student dashboard (feature 10). The assessment/course palette above
+     is unchanged — these three tokens were simply never defined here. */
+  --color-error: #ba1a1a;
+  --color-on-surface: #1b1c1c;
+  --color-streak-orange: #ff6d38;
 }
 
 body {

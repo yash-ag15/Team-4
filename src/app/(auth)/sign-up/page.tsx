@@ -40,10 +40,6 @@ export default function SignUpPage() {
       name,
       email,
       password,
-      ngoRole,
-      organization,
-      phone,
-      city,
     })
 
     if (result.error) {
@@ -52,8 +48,10 @@ export default function SignUpPage() {
       return
     }
 
-    router.push('/onboarding')
+    // refresh() first — see the note in sign-in/page.tsx. /post-auth is a server
+    // component and must not be rendered from the pre-sign-in router cache.
     router.refresh()
+    router.push('/post-auth')
   }
 
   async function onGoogle() {
@@ -61,7 +59,7 @@ export default function SignUpPage() {
     setPending(true)
     // Google returns email, name and picture only — the NGO fields are collected at
     // /onboarding instead.
-    await signIn.social({ provider: 'google', callbackURL: '/onboarding' })
+    await signIn.social({ provider: 'google', callbackURL: '/post-auth' })
   }
 
   return (
@@ -122,63 +120,7 @@ export default function SignUpPage() {
           <span className="text-xs text-gray-500">At least 8 characters.</span>
         </label>
 
-        <fieldset className="flex flex-col gap-4 rounded-md border border-gray-200 p-4">
-          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-gray-500">
-            Profile (optional)
-          </legend>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Role</span>
-            <select
-              name="ngoRole"
-              value={ngoRole}
-              onChange={(e) => setNgoRole(e.target.value as NgoRole)}
-              className={inputClass}
-            >
-              {NGO_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {role[0].toUpperCase() + role.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Organization</span>
-            <input
-              type="text"
-              name="organization"
-              autoComplete="organization"
-              value={organization}
-              onChange={(e) => setOrganization(e.target.value)}
-              className={inputClass}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Phone</span>
-            <input
-              type="tel"
-              name="phone"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className={inputClass}
-            />
-          </label>
-
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">City</span>
-            <input
-              type="text"
-              name="city"
-              autoComplete="address-level2"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className={inputClass}
-            />
-          </label>
-        </fieldset>
 
         <button
           type="submit"
