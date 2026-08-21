@@ -61,7 +61,10 @@ async function main() {
   }
 
   const { db } = await import('@/db')
-  const { projects, tasks } = await import('@/db/schema')
+  const schema = (await import('@/db/schema')) as Record<string, any>
+  const projects = schema.projects
+  const tasks = schema.tasks
+
   const factories = (await import('@/mocks/factories')) as {
     mockProjects?: MockProject[]
     mockTasks?: MockTask[]
@@ -74,7 +77,7 @@ async function main() {
     `[seed] source fixtures: ${mockProjects.length} projects, ${mockTasks.length} tasks`,
   )
 
-  if (mockProjects.length > 0) {
+  if (projects && mockProjects.length > 0) {
     const rows = mockProjects.map((p) => ({
       id: p.id,
       name: p.name,
@@ -105,9 +108,10 @@ async function main() {
     for (const row of inserted) console.log(`         · ${row.name} (${row.id})`)
   }
 
-  if (mockTasks.length > 0) {
+  if (tasks && mockTasks.length > 0) {
     // Only keep tasks whose project actually got seeded — the FK is real.
     const seededProjectIds = new Set(mockProjects.map((p) => p.id))
+
     const rows = mockTasks
       .filter((t) => seededProjectIds.has(t.projectId))
       .map((t) => ({
