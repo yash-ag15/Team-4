@@ -33,6 +33,14 @@ const encryptData = (model: string, data: Record<string, unknown> | undefined) =
   return { ...data, [EMAIL_FIELD]: encryptEmail(data[EMAIL_FIELD] as string) }
 }
 
+const ensureAccountIssuer = (model: string, data: Record<string, unknown> | undefined) => {
+  if (!data || model !== 'account') return data
+  if (!data.issuer) {
+    return { ...data, issuer: (data.providerId as string) || (data.accountId as string) || 'default' }
+  }
+  return data
+}
+
 /**
  * Equality on email becomes `IN (ciphertext, plaintext)`.
  *
@@ -113,8 +121,10 @@ export function withEmailEncryption(adapter: DBAdapter): DBAdapter {
   const wrapped: DBAdapter = {
     ...adapter,
 
-    create: async ({ model, data, ...rest }) =>
-      decryptRow(model, await adapter.create({ model, data: encryptData(model, data) as never, ...rest })),
+    create: async ({ model, data, ...rest }) => {
+      const preparedData = ensureAccountIssuer(model, encryptData(model, data) as Record<string, unknown>)
+      return decryptRow(model, await adapter.create({ model, data: preparedData as never, ...rest }))
+    },
 
     findOne: async ({ model, where, ...rest }) =>
       decryptRow(model, await adapter.findOne({ model, where: encryptWhere(model, where)!, ...rest })),

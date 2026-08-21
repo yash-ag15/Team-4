@@ -5,7 +5,7 @@ import type { z } from 'zod'
 import { ApiError } from '@/contracts/_kit'
 import type * as coursesContract from '@/contracts/courses'
 import { db } from '@/db'
-import { courses, courseSections, lessons, user } from '@/db/schema'
+import { courses, courseSections, lessons, user, assessments } from '@/db/schema'
 import { applyTrack } from '@/lib/xp'
 
 export type Course = z.infer<typeof coursesContract.Course>
@@ -18,15 +18,22 @@ export async function createCourse(
   input: CreateInput,
   sessionUser?: { id: string; systemRole?: string | null } | null,
 ): Promise<{ course: Course }> {
+  const slug =
+    input.slug ||
+    input.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+
   // Check if course with same slug already exists
   const [existingSlug] = await db
     .select({ id: courses.id })
     .from(courses)
-    .where(eq(courses.slug, input.slug))
+    .where(eq(courses.slug, slug))
     .limit(1)
 
   if (existingSlug) {
-    throw new ApiError('CONFLICT', `A course with slug "${input.slug}" already exists`)
+    throw new ApiError('CONFLICT', `A course with slug "${slug}" already exists`)
   }
 
   const mentorId = input.mentorId || sessionUser?.id
@@ -51,7 +58,7 @@ export async function createCourse(
     .insert(courses)
     .values({
       id: courseId,
-      slug: input.slug,
+      slug,
       title: input.title,
       subtitle: input.subtitle ?? '',
       description: input.description ?? '',
@@ -72,6 +79,77 @@ export async function createCourse(
     throw new ApiError('INTERNAL', 'Failed to create course')
   }
 
+  let totalSections = 0
+  let totalLessons = 0
+  if (input.sections && input.sections.length > 0) {
+    for (const [sIdx, s] of input.sections.entries()) {
+      const sectionId = `sec-${randomUUID().slice(0, 8)}`
+      
+      let summaryText = s.summary ?? ''
+      if (s.type && s.type !== 'online_course') {
+        const metaObj = {
+          type: s.type,
+          summary: s.summary,
+          meta: s.meta ?? {},
+        }
+        summaryText = JSON.stringify(metaObj)
+      }
+
+      await db.insert(courseSections).values({
+        id: sectionId,
+        courseId: inserted.id,
+        title: s.title,
+        summary: summaryText,
+        orderIndex: s.orderIndex ?? sIdx,
+        xpAward: s.xpAward ?? 50,
+      })
+      totalSections++
+
+      if (s.type === 'assignment' || s.type === 'project') {
+        const assessmentId = `asmt-${randomUUID().slice(0, 8)}`
+        const rubricText = s.meta?.rubric
+          ? typeof s.meta.rubric === 'string'
+            ? s.meta.rubric
+            : JSON.stringify(s.meta.rubric)
+          : 'Evaluation Rubric: Evidence (25%), Analysis (35%), Clarity (20%), Execution (20%)'
+
+        await db.insert(assessments).values({
+          id: assessmentId,
+          courseId: inserted.id,
+          sectionId,
+          title: s.title,
+          prompt: s.summary || s.title,
+          rubric: rubricText,
+          kind: s.type === 'project' ? 'project' : 'assignment',
+          maxScore: (s.meta?.maxScore as number) ?? 100,
+          xpAward: s.xpAward ?? 150,
+          orderIndex: sIdx,
+        })
+      }
+
+      if (s.lessons && s.lessons.length > 0) {
+        for (const [lIdx, l] of s.lessons.entries()) {
+          const lessonId = `les-${randomUUID().slice(0, 8)}`
+          const validKind =
+            l.kind === 'video' || l.kind === 'reading' || l.kind === 'link' ? l.kind : 'reading'
+
+          await db.insert(lessons).values({
+            id: lessonId,
+            sectionId,
+            title: l.title,
+            kind: validKind,
+            contentUrl: l.contentUrl ?? '',
+            contentBody: l.contentBody ?? '',
+            durationMin: l.durationMin ?? 10,
+            orderIndex: l.orderIndex ?? lIdx,
+            xpAward: l.xpAward ?? 10,
+          })
+          totalLessons++
+        }
+      }
+    }
+  }
+
   const totalXp = applyTrack(inserted.xpBonusOnComplete, inserted.track)
 
   return {
@@ -88,13 +166,13 @@ export async function createCourse(
       certificateEligible: inserted.certificateEligible,
       estimatedHours: inserted.estimatedHours,
       xpBonusOnComplete: inserted.xpBonusOnComplete,
-      totalXp,
+      totalXp: input.totalXp ?? totalXp,
       dueAt: inserted.dueAt ? inserted.dueAt.toISOString() : null,
       status: inserted.status as Course['status'],
       mentorId: inserted.mentorId,
       mentorName: mentorRow.name || 'Mentor',
-      sectionCount: 0,
-      lessonCount: 0,
+      sectionCount: totalSections,
+      lessonCount: totalLessons,
       enrolledCount: 0,
       createdAt: inserted.createdAt.toISOString(),
     },
@@ -268,5 +346,44 @@ export async function getCourse(
       createdAt: c.createdAt.toISOString(),
     },
     sections,
+  }
+}
+
+export async function listMentorCourses(
+  sessionUser?: { id: string; systemRole?: string | null } | null,
+): Promise<{
+  courses: {
+    id: string
+    title: string
+    track: Course['track']
+    enrolledCount: number
+    avgProgressPct: number
+    completionRate: number
+  }[]
+}> {
+  const mentorId = sessionUser?.id
+  const conditions = mentorId && sessionUser?.systemRole !== 'admin'
+    ? [eq(courses.mentorId, mentorId)]
+    : []
+
+  const courseRows = await db
+    .select({
+      id: courses.id,
+      title: courses.title,
+      track: courses.track,
+    })
+    .from(courses)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(courses.createdAt))
+
+  return {
+    courses: courseRows.map((c) => ({
+      id: c.id,
+      title: c.title,
+      track: c.track as Course['track'],
+      enrolledCount: 0,
+      avgProgressPct: 0,
+      completionRate: 0,
+    })),
   }
 }

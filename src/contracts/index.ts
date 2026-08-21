@@ -5,6 +5,7 @@
 import * as admin from './admin'
 import * as aiCoach from './ai-coach'
 import * as courses from './courses'
+import * as mentor from './mentor'
 import * as enrollments from './enrollments'
 import * as sessions from './sessions'
 import * as submissions from './submissions'
