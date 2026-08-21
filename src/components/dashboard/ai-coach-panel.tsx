@@ -3,21 +3,34 @@
 import React, { useState } from 'react';
 import { ChatMessage } from './types';
 
+/** The live coach brief from GET /api/ai-coach/brief. Optional: without it the panel
+ *  keeps its original static copy, so nothing breaks if the endpoint is unavailable. */
+export interface CoachPanelBrief {
+  headline: string;
+  strengths: string[];
+  focusAreas: string[];
+  nextActions: { label: string; href: string }[];
+  nudge: string;
+}
+
 interface AiCoachPanelProps {
   userName?: string;
+  brief?: CoachPanelBrief;
   onAskQuestion?: (question: string) => Promise<string> | string;
 }
 
-export function AiCoachPanel({ userName = 'Methika', onAskQuestion }: AiCoachPanelProps) {
+export function AiCoachPanel({ userName = 'Methika', brief, onAskQuestion }: AiCoachPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputQuestion, setInputQuestion] = useState('');
   const [isThinking, setIsThinking] = useState(false);
 
+  // The coach's own next steps lead; the stock prompts stay as a fallback so the panel
+  // is never empty while the brief is loading or the endpoint is down.
   const quickPrompts = [
     'What should I complete today?',
-    'Explain Data Structures to me',
-    'How do I maintain my 12-day streak?',
+    ...(brief ? brief.nextActions.map((a) => a.label) : []),
+    ...(brief ? ['Summarise my week and what to learn next'] : ['Explain Data Structures to me', 'How do I maintain my 12-day streak?']),
   ];
 
   const handlePromptClick = async (prompt: string) => {
@@ -108,7 +121,9 @@ export function AiCoachPanel({ userName = 'Methika', onAskQuestion }: AiCoachPan
 
           {/* Intro Message */}
           <p className="text-xs text-on-surface-variant leading-relaxed">
-            Hi {userName}! You&apos;re 1 task away from your goal today.
+            {brief
+              ? brief.headline
+              : `Hi ${userName}! You are 1 task away from your goal today.`}
           </p>
 
           {/* Conversation History */}

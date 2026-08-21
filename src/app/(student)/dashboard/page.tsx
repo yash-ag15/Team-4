@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { DashboardView } from '@/components/dashboard/dashboard-view'
 import { initialUser } from '@/components/dashboard/mock-data'
 import { auth } from '@/lib/auth'
+import { brief as loadCoachBrief } from '@/server/ai-coach'
 
 /**
  * The student dashboard — feature 10's `DashboardView`, rendered as built.
@@ -24,8 +25,20 @@ export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   const user = session!.user
 
+  // The bottom-right coach panel. Read here rather than fetched by the client so the
+  // panel opens already populated. It is cached per user for an hour inside
+  // server/ai-coach.ts, and degrades to the contract mock when GEMINI_API_KEY is unset —
+  // so a slow or missing model never blocks the dashboard from rendering.
+  let coachBrief
+  try {
+    coachBrief = (await loadCoachBrief(user.id)).brief
+  } catch {
+    coachBrief = undefined
+  }
+
   return (
     <DashboardView
+      coachBrief={coachBrief}
       initialUserData={{
         ...initialUser,
         id: user.id,
